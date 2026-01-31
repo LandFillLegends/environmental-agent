@@ -59,6 +59,14 @@ npm install
 
 ## Usage
 
+### Quick Start
+
+Try the quick demo to see all features:
+
+```bash
+npm run demo
+```
+
 ### Command Line Interface (CLI)
 
 Run the interactive CLI:
