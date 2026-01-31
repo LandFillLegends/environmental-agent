@@ -1,9 +1,11 @@
-# Landfill Legends
-♻️ Landfill Legends
+
+# ♻️ Landfill Legends
 
 Agentic assistant for correct, location-aware household waste disposal.
 
-🚀 Overview
+---
+
+## 🚀 Overview
 
 Landfill Legends helps users quickly figure out how to dispose of household items correctly based on item type, condition, and local rules.
 
@@ -11,109 +13,95 @@ Users can type or scan an item, and the agent returns clear disposal instruction
 
 Built as part of Break Through Tech AI – Maker Track.
 
-🧠 Why an Agent?
+---
+
+## 🧠 Why an Agent?
 
 This problem requires:
-
-Location-specific reasoning
-
-Multiple decision paths (curbside vs drop-off)
-
-External actions (maps, calendar)
-
-Clarifying questions for ambiguous items
+- Location-specific reasoning  
+- Multiple decision paths (curbside vs drop-off)  
+- External actions (maps, calendar)  
+- Clarifying questions for ambiguous items  
 
 A static LLM response isn’t sufficient.
 
-🔑 Core Features (MVP)
+---
 
-Text & image item input
+## 🔑 Core Features (MVP)
 
-Item identification (Gemini)
+- Text & image item input  
+- Item identification (Gemini)  
+- Local disposal rule lookup  
+- Drop-off detection + location search  
+- Basic scheduling suggestions  
+- Clear, step-by-step instructions  
 
-Local disposal rule lookup
+---
 
-Drop-off detection + location search
+## 🛠️ Tech Stack
 
-Basic scheduling suggestions
+- Frontend: React Native  
+- Backend: Python  
+- Database: Neon + PostgreSQL  
+- AI: Gemini API  
+- Tools / APIs:
+  - Web Search  
+  - Google Places  
+  - Google Calendar  
+  - Maps API  
 
-Clear, step-by-step instructions
+---
 
-🛠️ Tech Stack
+## 🧩 Agent Flow
 
-Frontend: React Native
+User Input (Text/Image)  
+↓  
+Item Identification  
+↓  
+Local Policy Lookup (Web / Cache)  
+↓  
+Drop-Off Required?  
+- No → Curbside Instructions  
+- Yes → Location + Time + Map  
 
-Backend: Python
+---
 
-Database: Neon + PostgreSQL
-
-AI: Gemini API
-
-Tools/APIs:
-
-Web Search
-
-Google Places
-
-Google Calendar
-
-Maps API
-
-🧩 Agent Flow
-User Input (Text/Image)
-        ↓
-Item Identification
-        ↓
-Local Policy Lookup (Web / Cache)
-        ↓
-Drop-Off Required?
-   ├─ No → Curbside Instructions
-   └─ Yes → Location + Time + Map
-
-📆 Roadmap
+## 📆 Roadmap
 
 February (MVP):
-
-Item identification
-
-Local rules lookup
-
-Drop-off logic
-
-Basic mobile UI
+- Item identification
+- Local rules lookup
+- Drop-off logic
+- Basic mobile UI
 
 March:
-
-Agentic looping
-
-Calendar + map integration
+- Agentic looping
+- Calendar + map integration
 
 April:
+- UI polish
+- Sustainable alternatives
+- Final demo
 
-UI polish
+---
 
-Sustainable alternatives
+## 👥 Team
 
-Final demo
+- Anour Ibrahim  
+- Joseann Boneo  
+- Archie Goli  
+- Tran Vo  
 
-👥 Team
+---
 
-Anour Ibrahim
+## 🔧 Dev Notes
 
-Joseann Boneo
+- API keys required (Gemini, Google APIs)
+- Disposal rules cached when possible
+- Focus on reliability over feature breadth
 
-Archie Goli
+---
 
-Tran Vo
+## 📌 Status
 
-🔧 Dev Notes
-
-API keys required (Gemini, Google APIs)
-
-Disposal rules cached when possible
-
-Focus on reliability over feature breadth
-
-📌 Status
-
-🟡 In active development
+In active development
