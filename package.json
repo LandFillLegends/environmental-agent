@@ -1,0 +1,31 @@
+{
+  "name": "environmental-agent",
+  "version": "1.0.0",
+  "description": "Landfill Legends - An agentic AI mobile app that helps households dispose of everyday items correctly",
+  "main": "src/agent.js",
+  "bin": {
+    "landfill-legends": "src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "examples": "node src/examples.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "waste",
+    "recycling",
+    "disposal",
+    "environment",
+    "sustainability",
+    "agent",
+    "ai"
+  ],
+  "author": "Landfill Legends Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
