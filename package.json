@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node src/cli.js",
+    "demo": "node demo.js",
     "examples": "node src/examples.js",
     "test": "jest"
   },
