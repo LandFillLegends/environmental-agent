@@ -1,241 +1,142 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Alert } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 
-import { Button } from "@/components/buttons"; 
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
+import { Button } from "@/components/buttons";
 import { useAppStore } from "@/store/useAppStore";
-import {
-  COLORS,
-  SPACING,
-  TYPOGRAPHY,
-  BORDER_RADIUS,
-  SHADOWS,
-} from "@/constants/theme";
 
-type PermissionKey = "location" | "camera" | "calendar";
-type PermissionStatus = "granted" | "denied" | "undetermined";
+// If you have your logo in /assets, update the path to match your project.
+const landfillLogo = require("@/assets/landfill-logo.png");
 
-type PermissionCardProps = {
-  icon: string;
-  title: string;
-  description: string;
-  required?: boolean;
-};
+export default function LoginScreen() {
+  const [loading, setLoading] = useState(false);
 
-export default function Permissions() {
-  const router = useRouter();
-  const [loading, setLoading] = useState<boolean>(false);
+  const setUser = useAppStore((s) => s.setUser);
 
-  const setPermission = useAppStore((state) => state.setPermission);
-
-  const handleContinue = async () => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
 
-    // Simulate permission requests
+    // Placeholder — swap with expo-auth-session later
     setTimeout(() => {
-      setPermission("location" as PermissionKey, "granted" as PermissionStatus);
-      setPermission("camera" as PermissionKey, "granted" as PermissionStatus);
-      setPermission("calendar" as PermissionKey, "granted" as PermissionStatus);
+      setUser?.({
+        id: "user_123",
+        email: "maya.student@example.com",
+        name: "Maya",
+        picture: null,
+      });
 
       setLoading(false);
-
-      // Go to main app
-      router.replace("/(tabs)/home"); // if you're using tabs for home
-      // or: router.replace("/(main)/home");
-    }, 1000);
+      router.replace("/(tabs)/home");
+    }, 900);
   };
 
-  const handleSkip = () => {
-    Alert.alert(
-      "Limited Features",
-      "Some features may not work without permissions. You can enable them later in settings.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Continue Anyway",
-          onPress: () => router.replace("/(tabs)/home"),
-          // or: router.replace("/(main)/home")
-        },
-      ]
-    );
+  const handleGuest = () => {
+    setUser?.({ id: "guest", name: "Guest", isGuest: true });
+    router.replace("/(tabs)/home");
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.icon}>🔑</Text>
-          <Text style={styles.title}>Let&apos;s Get You Set Up</Text>
-          <Text style={styles.subtitle}>
-            We need a few permissions to provide the best disposal guidance
-          </Text>
+      <View style={styles.wrap}>
+        {/* Logo */}
+        <View style={styles.logoSection}>
+          <Image source={landfillLogo} style={styles.logo} resizeMode="contain" />
         </View>
 
-        {/* Permission Cards */}
-        <View style={styles.permissions}>
-          <PermissionCard
-            icon="📍"
-            title="Location Access"
-            description="Required to provide accurate local disposal regulations and find nearby drop-off facilities"
-            required
-          />
-          <PermissionCard
-            icon="📸"
-            title="Camera Access"
-            description="Take photos of items for instant AI-powered identification"
-          />
-          <PermissionCard
-            icon="📅"
-            title="Calendar Access"
-            description="Schedule and manage drop-off appointments directly in your calendar"
-          />
-        </View>
+        {/* Bottom section */}
+        <View style={styles.bottom}>
+          <View style={styles.textBlock}>
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Sign in to get personalized disposal guidance</Text>
+          </View>
 
-        {/* Actions */}
-        <View style={styles.actions}>
           <Button
-            title="Enable Permissions"
-            onPress={handleContinue}
-            loading={loading}
+            title="Continue with Google"
+            onPress={handleGoogleLogin}
+            variant="outline"
             size="large"
-            icon="✓"
+            loading={loading}
+            icon="G"
           />
-          <Button
-            title="Skip for Now"
-            onPress={handleSkip}
-            variant="ghost"
-            size="medium"
-          />
-        </View>
 
-        {/* Info */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            💡 You can change these permissions anytime in your device settings
-          </Text>
+          <View style={styles.privacyRow}>
+            <Text style={styles.privacyIcon}>🛡️</Text>
+            <Text style={styles.privacyText}>Your data is private and secure</Text>
+          </View>
+
+          <Pressable onPress={handleGuest} style={styles.guestBtn}>
+            <Text style={styles.guestText}>Continue as guest</Text>
+          </Pressable>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
-function PermissionCard({ icon, title, description, required }: PermissionCardProps) {
-  return (
-    <View style={styles.permissionCard}>
-      <View style={styles.permissionHeader}>
-        <Text style={styles.permissionIcon}>{icon}</Text>
-
-        <View style={styles.permissionInfo}>
-          <View style={styles.permissionTitleRow}>
-            <Text style={styles.permissionTitle}>{title}</Text>
-            {required ? (
-              <View style={styles.requiredBadge}>
-                <Text style={styles.requiredText}>Required</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <Text style={styles.permissionDescription}>{description}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: COLORS.background },
+
+  wrap: {
     flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.xl,
-    gap: SPACING.xl,
+    justifyContent: "space-between",
   },
-  header: {
+
+  logoSection: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
   },
-  icon: {
-    fontSize: 64,
-    marginBottom: SPACING.md,
+  logo: {
+    width: "100%",
+    height: 220,
   },
+
+  bottom: {
+    gap: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+
+  textBlock: { alignItems: "center", gap: SPACING.xs },
   title: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
-    textAlign: "center",
-    marginBottom: SPACING.sm,
   },
   subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     textAlign: "center",
-    lineHeight: 24,
-    paddingHorizontal: SPACING.md,
+    lineHeight: 20,
   },
-  permissions: {
-    gap: SPACING.md,
-  },
-  permissionCard: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    ...SHADOWS.sm,
-  },
-  permissionHeader: {
-    flexDirection: "row",
-    gap: SPACING.md,
-  },
-  permissionIcon: {
-    fontSize: 32,
-  },
-  permissionInfo: {
-    flex: 1,
-  },
-  permissionTitleRow: {
+
+  privacyRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: SPACING.sm,
-    marginBottom: SPACING.xs,
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  permissionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-  },
-  requiredBadge: {
-    backgroundColor: COLORS.error,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  requiredText: {
+  privacyIcon: { fontSize: 12 },
+  privacyText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.surface,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.textSecondary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
-  permissionDescription: {
+
+  guestBtn: { alignItems: "center", paddingVertical: SPACING.sm },
+  guestText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
-    lineHeight: 20,
-  },
-  actions: {
-    gap: SPACING.md,
-  },
-  infoBox: {
-    backgroundColor: COLORS.accentLight,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  infoText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text,
-    textAlign: "center",
-    lineHeight: 20,
+    textDecorationLine: "underline",
   },
 });

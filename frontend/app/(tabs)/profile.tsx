@@ -8,65 +8,60 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 
+import CollapsibleMenuItem from "@/components/collapsibleMenuItem";
+import { DisposalBadge } from "@/components/disposalBadge";
 import { useAppStore } from "@/store/useAppStore";
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
-import { DISPOSAL_CATEGORIES } from '@/constants/disposal';
 
-type StatCardProps = {
-  icon: string;
-  value: string;
-  label: string;
+type HistoryItem = {
+  item: string;
+  type: "recycle" | "hazardous" | "compost" | "dropoff" | "trash";
+  date: string;
 };
 
-function StatCard({ icon, value, label }: StatCardProps) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statIcon}>{icon}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
+const stats = [
+  { label: "Items Disposed", value: "47", icon: "♻️" },
+  { label: "Eco Score", value: "82", icon: "🌿" },
+  { label: "This Week", value: "+5", icon: "📈" },
+];
 
-type MenuItemProps = {
-  icon: string;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-};
+const history: HistoryItem[] = [
+  { item: "Pizza Box", type: "recycle", date: "Today" },
+  { item: "AA Batteries", type: "hazardous", date: "Yesterday" },
+  { item: "Banana Peel", type: "compost", date: "Feb 10" },
+  { item: "Styrofoam", type: "dropoff", date: "Feb 8" },
+  { item: "Plastic Bag", type: "trash", date: "Feb 7" },
+];
 
-function MenuItem({ icon, title, subtitle, onPress }: MenuItemProps) {
-  return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-      <Text style={styles.menuIcon}>{icon}</Text>
-      <View style={styles.menuInfo}>
-        <Text style={styles.menuTitle}>{title}</Text>
-        <Text style={styles.menuSubtitle}>{subtitle}</Text>
-      </View>
-      <Text style={styles.menuArrow}>›</Text>
-    </TouchableOpacity>
-  );
-}
+const savedLocations = [
+  { name: "EcoStation North", address: "1234 Green Ave, Seattle" },
+  { name: "Hazardous Waste Depot", address: "890 Industrial Blvd, Seattle" },
+  { name: "Community Recycling Hub", address: "456 Oak St, Bellevue" },
+];
 
-export default function Profile() {
-  const router = useRouter();
+const calendarEvent = [
+  { label: "Event", value: "Drop-off at Recycling Center" },
+  { label: "Location", value: "Facility" },
+  { label: "Date & Time", value: "Friday, Feb 16, 2:00 PM - 3:00 PM" },
+  { label: "Travel Time", value: "~8 minutes" },
+];
 
+export default function ProfileScreen() {
   const user = useAppStore((s) => s.user);
   const logout = useAppStore((s) => s.logout);
-  const disposalHistory = useAppStore((s) => s.disposalHistory);
-  const scheduledDropoffs = useAppStore((s) => s.scheduledDropoffs);
 
-  const handleLogout = () => {
-    Alert.alert("Log Out", "Are you sure you want to log out?", [
+  const handleSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Log Out",
+        text: "Sign Out",
         style: "destructive",
         onPress: () => {
-          logout();
-          router.replace("/(auth)/welcome");
+          logout?.();
+          // back to auth welcome
+          router.replace("/(auth)");
         },
       },
     ]);
@@ -74,154 +69,296 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {user?.name?.charAt(0)?.toUpperCase() || "?"}
+              {(user?.name?.[0] ?? "M").toUpperCase()}
             </Text>
           </View>
-
-          <Text style={styles.userName}>{user?.name || "User"}</Text>
-          <Text style={styles.userEmail}>
-            {user?.email || "guest@landfilllegends.com"}
-          </Text>
+          <View style={styles.headerText}>
+            <Text style={styles.name}>{user?.name ?? "Maya Johnson"}</Text>
+            <Text style={styles.meta}>Seattle, WA • Joined Jan 2025</Text>
+          </View>
         </View>
 
         {/* Stats */}
-        <View style={styles.statsSection}>
-          <StatCard icon="♻️" value="42" label="Items Disposed" />
-          <StatCard icon="🌱" value="8.2kg" label="CO₂ Saved" />
-          <StatCard icon="📅" value={String(scheduledDropoffs.length)} label="Upcoming" />
+        <View style={styles.statsRow}>
+          {stats.map((s) => (
+            <View key={s.label} style={styles.statCard}>
+              <Text style={styles.statIcon}>{s.icon}</Text>
+              <Text style={styles.statValue}>{s.value}</Text>
+              <Text style={styles.statLabel}>{s.label}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Menu Items */}
-        <View style={styles.menuSection}>
-          <MenuItem
-            icon="📜"
-            title="Disposal History"
-            subtitle={`${disposalHistory.length} items`}
-            onPress={() => Alert.alert("Coming Soon", "History view coming soon!")}
-          />
-          <MenuItem
-            icon="📍"
-            title="Saved Locations"
-            subtitle="Manage favorite facilities"
-            onPress={() => Alert.alert("Coming Soon", "Saved locations coming soon!")}
-          />
-          <MenuItem
-            icon="🔔"
-            title="Notifications"
-            subtitle="Manage reminders"
-            onPress={() => Alert.alert("Coming Soon", "Notification settings coming soon!")}
-          />
-          <MenuItem
+        {/* Collapsible menus */}
+        <View style={styles.menuCard}>
+          <View style={styles.dividerTop} />
+
+          <CollapsibleMenuItem icon="📜" label="Disposal History">
+            <View style={styles.innerSection}>
+              {history.map((h, i) => (
+                <View
+                  key={`${h.item}-${i}`}
+                  style={[
+                    styles.innerRow,
+                    i !== 0 && styles.innerRowDivider,
+                  ]}
+                >
+                  <View style={styles.historyLeft}>
+                    <Text style={styles.historyItem}>{h.item}</Text>
+                    <DisposalBadge category={h.type} size="small" />
+                  </View>
+                  <Text style={styles.historyDate}>{h.date}</Text>
+                </View>
+              ))}
+            </View>
+          </CollapsibleMenuItem>
+
+          <View style={styles.divider} />
+
+          <CollapsibleMenuItem icon="📍" label="Saved Locations">
+            <View style={styles.innerSection}>
+              {savedLocations.map((loc, i) => (
+                <View
+                  key={`${loc.name}-${i}`}
+                  style={[
+                    styles.innerRow,
+                    i !== 0 && styles.innerRowDivider,
+                  ]}
+                >
+                  <Text style={styles.locationPin}>📌</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.locationName}>{loc.name}</Text>
+                    <Text style={styles.locationAddress}>{loc.address}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </CollapsibleMenuItem>
+
+          <View style={styles.divider} />
+
+          <CollapsibleMenuItem icon="🔔" label="Notifications">
+            <View style={styles.innerSection}>
+              <Text style={styles.previewTitle}>📅 Calendar Event Preview</Text>
+
+              {calendarEvent.map((row) => (
+                <View key={row.label} style={styles.previewRow}>
+                  <Text style={styles.previewLabel}>{row.label}</Text>
+                  <Text style={styles.previewValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+          </CollapsibleMenuItem>
+        </View>
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <ActionRow
             icon="⚙️"
-            title="Settings"
-            subtitle="App preferences"
+            label="Settings"
             onPress={() => Alert.alert("Coming Soon", "Settings coming soon!")}
           />
-          <MenuItem
-            icon="ℹ️"
-            title="About"
-            subtitle="Learn more about Landfill Legends"
-            onPress={() =>
-              Alert.alert(
-                "About",
-                "Landfill Legends v1.0.0\n\nYour AI-powered disposal assistant"
-              )
-            }
-          />
+          <ActionRow icon="🚪" label="Sign Out" onPress={handleSignOut} danger />
         </View>
-
-        {/* Logout */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.85}>
-          <Text style={styles.logoutText}>🚪 Log Out</Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function ActionRow({
+  icon,
+  label,
+  onPress,
+  danger,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={[styles.actionRow, danger && styles.actionRowDanger]}
+    >
+      <View style={styles.actionLeft}>
+        <Text style={styles.actionIcon}>{icon}</Text>
+        <Text style={[styles.actionLabel, danger && styles.actionLabelDanger]}>
+          {label}
+        </Text>
+      </View>
+      <Text style={styles.actionChevron}>›</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollView: { flex: 1 },
+  scroll: { flex: 1 },
   content: { padding: SPACING.lg, gap: SPACING.lg },
-  header: { alignItems: "center", paddingVertical: SPACING.lg },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: SPACING.md,
   },
   avatarText: {
-    fontSize: 36,
+    fontSize: 22,
     color: COLORS.surface,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
   },
-  userName: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
+  headerText: { flex: 1 },
+  name: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
-    marginBottom: SPACING.xs,
   },
-  userEmail: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
-  statsSection: { flexDirection: "row", gap: SPACING.md },
+  meta: {
+    marginTop: 2,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+  },
+
+  statsRow: { flexDirection: "row", gap: SPACING.md },
   statCard: {
     flex: 1,
     backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
     ...SHADOWS.sm,
   },
-  statIcon: { fontSize: 28, marginBottom: SPACING.xs },
+  statIcon: { fontSize: 18, marginBottom: 4 },
   statValue: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
-    marginBottom: 2,
   },
-  statLabel: { fontSize: TYPOGRAPHY.fontSize.xs, color: COLORS.textSecondary, textAlign: "center" },
-  menuSection: {
+  statLabel: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+  },
+
+  menuCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     overflow: "hidden",
     ...SHADOWS.sm,
   },
-  menuItem: {
+  dividerTop: { height: 0 },
+  divider: { height: 1, backgroundColor: COLORS.border },
+
+  innerSection: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.background,
+    paddingBottom: SPACING.sm,
+  },
+  innerRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: 12,
     gap: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
-  menuIcon: { fontSize: 24 },
-  menuInfo: { flex: 1 },
-  menuTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text,
-    marginBottom: 2,
-  },
-  menuSubtitle: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
-  menuArrow: { fontSize: 24, color: COLORS.textLight },
-  logoutButton: {
-    backgroundColor: `${COLORS.error}10`,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
+  innerRowDivider: { borderTopWidth: 1, borderTopColor: COLORS.border },
+
+  historyLeft: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: `${COLORS.error}30`,
+    gap: SPACING.md,
   },
-  logoutText: {
+  historyItem: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+  },
+  historyDate: { fontSize: 12, color: COLORS.textSecondary },
+
+  locationPin: { fontSize: 14 },
+  locationName: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+  },
+  locationAddress: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+
+  previewTitle: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+  },
+  previewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: SPACING.md,
+  },
+  previewLabel: { fontSize: 12, color: COLORS.textSecondary },
+  previewValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 12,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+  },
+
+  actions: { gap: SPACING.sm },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  actionRowDanger: {
+    borderColor: COLORS.error + "40",
+    backgroundColor: COLORS.error + "08",
+  },
+  actionLeft: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
+  actionIcon: { fontSize: 16 },
+  actionLabel: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.error,
+    color: COLORS.text,
   },
+  actionLabelDanger: { color: COLORS.error },
+  actionChevron: { fontSize: 22, color: COLORS.textSecondary },
 });

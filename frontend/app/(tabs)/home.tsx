@@ -4,323 +4,292 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  Alert,
+  Pressable,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-
-import { Button } from "@/components/buttons"; // or default import if needed
-import { useAppStore } from "@/store/useAppStore";
+import { router } from "expo-router";
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
-import { DISPOSAL_CATEGORIES } from '@/constants/disposal';
+import { useAppStore } from "@/store/useAppStore";
 
-type SelectedImage = {
-  uri: string;
-  type: "photo" | "gallery";
-} | null;
+type InputType = "text" | "image";
 
-type StatCardProps = {
-  icon: string;
-  value: string;
-  label: string;
-};
+const RECENT_ITEMS = [
+  { name: "Pizza Box", emoji: "🍕" },
+  { name: "Plastic Bottle", emoji: "🧴" },
+  { name: "Battery", emoji: "🔋" },
+  { name: "Styrofoam", emoji: "📦" },
+] as const;
 
-function StatCard({ icon, value, label }: StatCardProps) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statIcon}>{icon}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
+export default function HomeScreen() {
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim();
 
-type RecentItemProps = {
-  icon: string;
-  name: string;
-  category: string;
-  onPress: () => void;
-};
-
-function RecentItem({ icon, name, category, onPress }: RecentItemProps) {
-  return (
-    <TouchableOpacity style={styles.recentItem} onPress={onPress} activeOpacity={0.75}>
-      <Text style={styles.recentIcon}>{icon}</Text>
-      <View style={styles.recentInfo}>
-        <Text style={styles.recentName}>{name}</Text>
-        <Text style={styles.recentCategory}>{category}</Text>
-      </View>
-      <Text style={styles.recentArrow}>→</Text>
-    </TouchableOpacity>
-  );
-}
-
-export default function Home() {
-  const router = useRouter();
-
-  const [itemText, setItemText] = useState<string>("");
-  const [selectedImage, setSelectedImage] = useState<SelectedImage>(null);
-
-  const user = useAppStore((s) => s.user);
   const setCurrentItem = useAppStore((s) => s.setCurrentItem);
 
-  const canSubmit = useMemo(
-    () => itemText.trim().length > 0 || selectedImage !== null,
-    [itemText, selectedImage]
-  );
+  const canSubmit = trimmed.length > 0;
 
-  const handleTakePhoto = () => {
-    const mockImage = {
-      uri: "https://via.placeholder.com/400x300",
-      type: "photo" as const,
-    };
-    setSelectedImage(mockImage);
-    Alert.alert("Photo Captured", "Ready to analyze!");
-  };
+  const handleSubmit = (q: string, type: InputType) => {
+    const clean = q.trim();
+    if (!clean && type === "text") return;
 
-  const handlePickImage = () => {
-    const mockImage = {
-      uri: "https://via.placeholder.com/400x300",
-      type: "gallery" as const,
-    };
-    setSelectedImage(mockImage);
-    Alert.alert("Image Selected", "Ready to analyze!");
-  };
+    Keyboard.dismiss();
 
-  const handleSubmit = () => {
-    if (!itemText.trim() && !selectedImage) {
-      Alert.alert("No Item", "Please enter an item or take a photo");
-      return;
-    }
+    // Store it globally (recommended for your flow: Home -> Processing -> Results)
+    // If your store signature differs, tell me and I’ll adjust.
+    setCurrentItem(clean || "Photo item", type === "image" ? { uri: "mock://camera" } : null);
 
-    // If your store expects (itemText, image), keep it:
-    setCurrentItem(itemText || "Photo item", selectedImage);
-
-    // Processing lives in (main)
+    // Navigate to processing route (Expo Router)
     router.push("/(main)/processing");
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Hi, {user?.name || "there"}! 👋</Text>
-            <Text style={styles.subtitle}>What do you need to dispose of?</Text>
+            <Text style={styles.hello}>Hello there 👋</Text>
+            <Text style={styles.title}>What&apos;s in your hand?</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => router.push("/(tabs)/profile")}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.profileIcon}>👤</Text>
-          </TouchableOpacity>
+          <View style={styles.leafBadge}>
+            <Text style={styles.leafIcon}>🍃</Text>
+          </View>
         </View>
 
-        {/* Quick Stats */}
-        <View style={styles.statsContainer}>
-          <StatCard icon="♻️" value="42" label="Items Recycled" />
-          <StatCard icon="🌱" value="8.2kg" label="CO₂ Saved" />
-        </View>
-
-        {/* Main Input Section */}
-        <View style={styles.inputSection}>
-          <Text style={styles.sectionTitle}>Submit Your Item</Text>
-
-          {/* Text Input */}
-          <View style={styles.textInputContainer}>
+        {/* Input Card */}
+        <View style={styles.inputCard}>
+          <View style={styles.searchRow}>
+            <Text style={styles.searchIcon}>🔎</Text>
             <TextInput
-              style={styles.textInput}
-              placeholder="Type item name (e.g., plastic bottle, batteries)..."
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Type an item to dispose..."
               placeholderTextColor={COLORS.textLight}
-              value={itemText}
-              onChangeText={setItemText}
-              multiline
-              numberOfLines={3}
+              style={styles.input}
+              returnKeyType="search"
+              onSubmitEditing={() => handleSubmit(trimmed, "text")}
             />
           </View>
 
-          {/* Divider */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
+          <View style={styles.actionsRow}>
+            <Pressable
+              onPress={() => handleSubmit(trimmed, "text")}
+              disabled={!canSubmit}
+              style={({ pressed }) => [
+                styles.identifyBtn,
+                !canSubmit && styles.identifyBtnDisabled,
+                pressed && canSubmit && styles.pressed,
+              ]}
+            >
+              <Text style={styles.identifyBtnText}>✨ Identify</Text>
+            </Pressable>
 
-          {/* Image Input */}
-          <View style={styles.imageSection}>
-            {selectedImage ? (
-              <View style={styles.imagePreview}>
-                <Image source={{ uri: selectedImage.uri }} style={styles.previewImage} />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() => setSelectedImage(null)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.removeImageText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.imageButtons}>
-                <TouchableOpacity style={styles.imageButton} onPress={handleTakePhoto} activeOpacity={0.8}>
-                  <Text style={styles.imageButtonIcon}>📸</Text>
-                  <Text style={styles.imageButtonText}>Take Photo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.imageButton} onPress={handlePickImage} activeOpacity={0.8}>
-                  <Text style={styles.imageButtonIcon}>🖼️</Text>
-                  <Text style={styles.imageButtonText}>Choose from Gallery</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <Pressable
+              onPress={() => handleSubmit("Photo item", "image")}
+              style={({ pressed }) => [styles.cameraBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.cameraBtnText}>📷</Text>
+            </Pressable>
           </View>
-
-          {/* Submit Button */}
-          <Button
-            title="Identify Disposal Method"
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            size="large"
-            icon="🔍"
-          />
         </View>
 
-        {/* Recent Items */}
-        <View style={styles.recentSection}>
-          <Text style={styles.sectionTitle}>Recent Items</Text>
+        {/* Quick Items */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>COMMON ITEMS</Text>
 
-          <RecentItem
-            icon="♻️"
-            name="Plastic Water Bottle"
-            category="Recycle"
-            onPress={() => setItemText("Plastic Water Bottle")}
-          />
-          <RecentItem
-            icon="🗑️"
-            name="Pizza Box (greasy)"
-            category="Trash"
-            onPress={() => setItemText("Pizza Box")}
-          />
-          <RecentItem
-            icon="⚠️"
-            name="AA Batteries"
-            category="Hazardous"
-            onPress={() => setItemText("AA Batteries")}
-          />
+          <View style={styles.grid}>
+            {RECENT_ITEMS.map((item) => (
+              <Pressable
+                key={item.name}
+                onPress={() => handleSubmit(item.name, "text")}
+                style={({ pressed }) => [
+                  styles.commonItem,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.commonEmoji}>{item.emoji}</Text>
+                <Text style={styles.commonText}>{item.name}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
-      </ScrollView>
+
+        {/* Eco Tip */}
+        <View style={styles.tipCard}>
+          <View style={styles.tipIconWrap}>
+            <Text style={styles.tipIcon}>🍃</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Eco Tip of the Day</Text>
+            <Text style={styles.tipText}>
+              Rinse containers before recycling — food residue can contaminate an entire batch!
+            </Text>
+          </View>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollView: { flex: 1 },
-  content: { padding: SPACING.lg, gap: SPACING.lg },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  greeting: {
+  content: {
+    flex: 1,
+    padding: SPACING.lg,
+    gap: SPACING.lg,
+  },
+
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  hello: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+  },
+  title: {
+    marginTop: 2,
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
-    marginBottom: SPACING.xs,
   },
-  subtitle: { fontSize: TYPOGRAPHY.fontSize.md, color: COLORS.textSecondary },
-  profileButton: {
-    width: 48,
-    height: 48,
+  leafBadge: {
+    width: 40,
+    height: 40,
     borderRadius: BORDER_RADIUS.round,
     backgroundColor: COLORS.primary,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
   },
-  profileIcon: { fontSize: 24 },
-  statsContainer: { flexDirection: "row", gap: SPACING.md },
-  statCard: {
-    flex: 1,
+  leafIcon: {
+    fontSize: 18,
+    color: COLORS.surface,
+  },
+
+  inputCard: {
     backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.xl,
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    alignItems: "center",
-    ...SHADOWS.sm,
-  },
-  statIcon: { fontSize: 28, marginBottom: SPACING.xs },
-  statValue: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text,
-    marginBottom: 2,
-  },
-  statLabel: { fontSize: TYPOGRAPHY.fontSize.xs, color: COLORS.textSecondary, textAlign: "center" },
-  inputSection: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    gap: SPACING.lg,
-    ...SHADOWS.md,
-  },
-  sectionTitle: { fontSize: TYPOGRAPHY.fontSize.lg, fontWeight: TYPOGRAPHY.fontWeight.semibold, color: COLORS.text },
-  textInputContainer: {
-    backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.border,
-  },
-  textInput: {
-    padding: SPACING.md,
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.text,
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  divider: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
-  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
-  dividerText: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary, fontWeight: TYPOGRAPHY.fontWeight.medium },
-  imageSection: { minHeight: 120 },
-  imageButtons: { flexDirection: "row", gap: SPACING.md },
-  imageButton: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    borderStyle: "dashed",
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.lg,
-    alignItems: "center",
-    gap: SPACING.sm,
-  },
-  imageButtonIcon: { fontSize: 32 },
-  imageButtonText: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary, textAlign: "center", fontWeight: TYPOGRAPHY.fontWeight.medium },
-  imagePreview: { position: "relative", borderRadius: BORDER_RADIUS.md, overflow: "hidden" },
-  previewImage: { width: "100%", height: 200, borderRadius: BORDER_RADIUS.md },
-  removeImageButton: {
-    position: "absolute",
-    top: SPACING.sm,
-    right: SPACING.sm,
-    width: 32,
-    height: 32,
-    borderRadius: BORDER_RADIUS.round,
-    backgroundColor: COLORS.error,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  removeImageText: { color: COLORS.surface, fontSize: 18, fontWeight: TYPOGRAPHY.fontWeight.bold },
-  recentSection: { gap: SPACING.md },
-  recentItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surface,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
     gap: SPACING.md,
     ...SHADOWS.sm,
   },
-  recentIcon: { fontSize: 24 },
-  recentInfo: { flex: 1 },
-  recentName: { fontSize: TYPOGRAPHY.fontSize.md, fontWeight: TYPOGRAPHY.fontWeight.medium, color: COLORS.text, marginBottom: 2 },
-  recentCategory: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
-  recentArrow: { fontSize: 20, color: COLORS.textLight },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.md,
+    height: 48,
+    gap: SPACING.sm,
+  },
+  searchIcon: { fontSize: 16 },
+  input: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.text,
+  },
+
+  actionsRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  identifyBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  identifyBtnDisabled: {
+    backgroundColor: COLORS.border,
+  },
+  identifyBtnText: {
+    color: COLORS.surface,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+  },
+  cameraBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraBtnText: { fontSize: 18 },
+
+  section: { gap: SPACING.sm },
+  sectionLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    letterSpacing: 1,
+  },
+
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  commonItem: {
+    width: "48%",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  commonEmoji: { fontSize: 22 },
+  commonText: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+  },
+
+  tipCard: {
+    backgroundColor: COLORS.accentLight,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
+    flexDirection: "row",
+    gap: SPACING.md,
+    alignItems: "flex-start",
+  },
+  tipIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: BORDER_RADIUS.round,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  tipIcon: { fontSize: 14, color: COLORS.surface },
+  tipTitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+  },
+  tipText: {
+    marginTop: 4,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+
+  pressed: { opacity: 0.85 },
 });

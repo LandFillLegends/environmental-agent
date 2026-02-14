@@ -1,162 +1,105 @@
 import React from "react";
-import { View, Text, StyleSheet, StatusBar } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 
-import { Button } from "@/components/buttons"; 
+import { Button } from "@/components/buttons";
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "@/constants/theme";
 
-type FeatureProps = {
-  icon: string;
-  title: string;
-  description: string;
-};
+// Update path if your logo lives somewhere else
+const landfillLogo = require("@/assets/landfill-logo.png");
 
-export default function Welcome() {
-  const router = useRouter();
-
-  const handleGetStarted = () => {
-    router.push("/(auth)/login");
-  };
-
+export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      <View style={styles.wrap}>
+        {/* Logo */}
+        <View style={styles.logoSection}>
+          <Image source={landfillLogo} style={styles.logo} resizeMode="contain" />
+        </View>
 
-      <View style={styles.content}>
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.iconContainer}>
-            <Text style={styles.heroIcon}>🌍</Text>
-            <Text style={styles.recycleIcon}>♻️</Text>
-          </View>
+        {/* Bottom section */}
+        <View style={styles.bottom}>
+          <Text style={styles.title}>
+            Dispose smarter,{"\n"}live greener
+          </Text>
 
-          <Text style={styles.title}>Landfill Legends</Text>
           <Text style={styles.subtitle}>
-            Your AI-powered disposal assistant for a cleaner planet
+            AI-powered disposal guidance tailored to your location and local rules.
           </Text>
-        </View>
 
-        {/* Features */}
-        <View style={styles.features}>
-          <Feature
-            icon="📸"
-            title="Snap & Identify"
-            description="Take a photo or type what you need to dispose of"
-          />
-          <Feature
-            icon="📍"
-            title="Local Rules"
-            description="Get disposal guidance based on your location"
-          />
-          <Feature
-            icon="📅"
-            title="Easy Scheduling"
-            description="Schedule drop-offs with integrated calendar"
-          />
-        </View>
+          <View style={styles.actions}>
+            <Button
+              title="Get Started"
+              onPress={() => router.push("/(auth)/permissions")}
+              size="large"
+              icon="🚀"
+            />
 
-        {/* CTA */}
-        <View style={styles.ctaSection}>
-          <Button title="Get Started" onPress={handleGetStarted} size="large" icon="🚀" />
-          <Text style={styles.disclaimer}>
-            Join thousands making sustainable disposal easy
-          </Text>
+            <Pressable onPress={() => router.push("/(auth)/login")} hitSlop={10}>
+              <Text style={styles.link}>I already have an account</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </SafeAreaView>
   );
 }
 
-function Feature({ icon, title, description }: FeatureProps) {
-  return (
-    <View style={styles.feature}>
-      <Text style={styles.featureIcon}>{icon}</Text>
-      <View style={styles.featureText}>
-        <Text style={styles.featureTitle}>{title}</Text>
-        <Text style={styles.featureDescription}>{description}</Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.primary,
-  },
-  content: {
+  container: { flex: 1, backgroundColor: COLORS.background },
+
+  wrap: {
     flex: 1,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.xl,
     justifyContent: "space-between",
   },
-  heroSection: {
+
+  logoSection: {
+    flex: 1,
     alignItems: "center",
-    paddingTop: SPACING.xxl,
+    justifyContent: "center",
   },
-  iconContainer: {
-    position: "relative",
-    marginBottom: SPACING.xl,
+  logo: {
+    width: "100%",
+    height: 240,
+    borderRadius: BORDER_RADIUS.md,
   },
-  heroIcon: {
-    fontSize: 100,
+
+  bottom: {
+    gap: SPACING.md,
+    alignItems: "center",
+    paddingBottom: SPACING.md,
   },
-  recycleIcon: {
-    fontSize: 40,
-    position: "absolute",
-    bottom: -10,
-    right: -10,
-  },
+
   title: {
     fontSize: TYPOGRAPHY.fontSize.xxxl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.surface,
-    marginBottom: SPACING.md,
+    color: COLORS.text,
     textAlign: "center",
+    lineHeight: 44,
   },
+
   subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    color: COLORS.accentLight,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textSecondary,
     textAlign: "center",
-    lineHeight: 28,
-    paddingHorizontal: SPACING.md,
+    lineHeight: 24,
+    paddingHorizontal: SPACING.lg,
   },
-  features: {
-    gap: SPACING.lg,
-  },
-  feature: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    alignItems: "center",
+
+  actions: {
+    width: "100%",
     gap: SPACING.md,
+    paddingTop: SPACING.md,
   },
-  featureIcon: {
-    fontSize: 32,
-  },
-  featureText: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.surface,
-    marginBottom: SPACING.xs,
-  },
-  featureDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.accentLight,
-    lineHeight: 20,
-  },
-  ctaSection: {
-    gap: SPACING.md,
-    alignItems: "center",
-  },
-  disclaimer: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.accentLight,
+
+  link: {
     textAlign: "center",
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    textDecorationLine: "underline",
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
 });

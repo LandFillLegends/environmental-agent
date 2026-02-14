@@ -1,217 +1,148 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from '@/components/buttons';
-import { useAppStore } from '@/store/useAppStore';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/theme';
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
-export const PermissionsScreen = ({ navigation }) => {
-  const [loading, setLoading] = useState(false);
-  const setPermission = useAppStore((state) => state.setPermission);
+import { Button } from "@/components/buttons";
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
 
-  const handleContinue = async () => {
-    setLoading(true);
+type Slide = {
+  emoji: string;
+  title: string;
+  description: string;
+  bg: string;
+};
 
-    // Simulate permission requests
-    setTimeout(() => {
-      setPermission('location', 'granted');
-      setPermission('camera', 'granted');
-      setPermission('calendar', 'granted');
-      setLoading(false);
-      navigation.navigate('Home');
-    }, 1000);
+export default function PermissionsScreen() {
+  const slides = useMemo<Slide[]>(
+    () => [
+      {
+        emoji: "📸",
+        title: "Snap or Type",
+        description:
+          "Take a photo of your waste or type what you need to dispose of. Our AI identifies it instantly.",
+        bg: COLORS.accentLight,
+      },
+      {
+        emoji: "📍",
+        title: "Local Rules, Automatically",
+        description:
+          "We check your local regulations so you always know the right bin, drop-off, or method.",
+        bg: COLORS.surfaceDark,
+      },
+      {
+        emoji: "📅",
+        title: "Schedule Drop-Offs",
+        description:
+          "For items that need special handling, we'll find the nearest facility and help you schedule.",
+        bg: COLORS.warning + "22",
+      },
+    ],
+    []
+  );
+
+  const [current, setCurrent] = useState(0);
+
+  const next = () => {
+    if (current < slides.length - 1) {
+      setCurrent((p) => p + 1);
+      return;
+    }
+    router.replace("/(tabs)/home");
   };
 
-  const handleSkip = () => {
-    Alert.alert(
-      'Limited Features',
-      'Some features may not work without permissions. You can enable them later in settings.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Continue Anyway', 
-          onPress: () => navigation.navigate('Home'),
-        },
-      ]
-    );
-  };
+  const skip = () => router.replace("/(tabs)/home");
+
+  const slide = slides[current];
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.icon}>🔑</Text>
-          <Text style={styles.title}>Let's Get You Set Up</Text>
-          <Text style={styles.subtitle}>
-            We need a few permissions to provide the best disposal guidance
-          </Text>
+      {/* Skip */}
+      <View style={styles.topRow}>
+        <Pressable onPress={skip} hitSlop={10}>
+          <Text style={styles.skip}>Skip</Text>
+        </Pressable>
+      </View>
+
+      {/* Slide */}
+      <View style={styles.center}>
+        <View style={[styles.iconBox, { backgroundColor: slide.bg }]}>
+          <Text style={styles.emoji}>{slide.emoji}</Text>
         </View>
 
-        {/* Permission Cards */}
-        <View style={styles.permissions}>
-          <PermissionCard
-            icon="📍"
-            title="Location Access"
-            description="Required to provide accurate local disposal regulations and find nearby drop-off facilities"
-            required={true}
-          />
-          <PermissionCard
-            icon="📸"
-            title="Camera Access"
-            description="Take photos of items for instant AI-powered identification"
-            required={false}
-          />
-          <PermissionCard
-            icon="📅"
-            title="Calendar Access"
-            description="Schedule and manage drop-off appointments directly in your calendar"
-            required={false}
-          />
+        <Text style={styles.title}>{slide.title}</Text>
+        <Text style={styles.description}>{slide.description}</Text>
+      </View>
+
+      {/* Dots + Button */}
+      <View style={styles.bottom}>
+        <View style={styles.dotsRow}>
+          {slides.map((_, i) => {
+            const active = i === current;
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.dot,
+                  active ? styles.dotActive : styles.dotInactive,
+                ]}
+              />
+            );
+          })}
         </View>
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          <Button
-            title="Enable Permissions"
-            onPress={handleContinue}
-            loading={loading}
-            size="large"
-            icon="✓"
-          />
-          <Button
-            title="Skip for Now"
-            onPress={handleSkip}
-            variant="ghost"
-            size="medium"
-          />
-        </View>
-
-        {/* Info */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            💡 You can change these permissions anytime in your device settings
-          </Text>
-        </View>
-      </ScrollView>
+        <Button
+          title={current === slides.length - 1 ? "Let's Go!" : "Next"}
+          onPress={next}
+          size="large"
+          icon="→"
+        />
+      </View>
     </SafeAreaView>
   );
-};
-
-const PermissionCard = ({ icon, title, description, required }) => (
-  <View style={styles.permissionCard}>
-    <View style={styles.permissionHeader}>
-      <Text style={styles.permissionIcon}>{icon}</Text>
-      <View style={styles.permissionInfo}>
-        <View style={styles.permissionTitleRow}>
-          <Text style={styles.permissionTitle}>{title}</Text>
-          {required && (
-            <View style={styles.requiredBadge}>
-              <Text style={styles.requiredText}>Required</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.permissionDescription}>{description}</Text>
-      </View>
-    </View>
-  </View>
-);
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
+  container: { flex: 1, backgroundColor: COLORS.background, padding: SPACING.lg },
+
+  topRow: { alignItems: "flex-end" },
+  skip: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
-  scrollView: {
-    flex: 1,
+
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: SPACING.lg },
+  iconBox: {
+    width: 112,
+    height: 112,
+    borderRadius: BORDER_RADIUS.xl,
+    alignItems: "center",
+    justifyContent: "center",
+    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  content: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xl,
-    gap: SPACING.xl,
-  },
-  header: {
-    alignItems: 'center',
-  },
-  icon: {
-    fontSize: 64,
-    marginBottom: SPACING.md,
-  },
+  emoji: { fontSize: 48 },
+
   title: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
-    textAlign: 'center',
-    marginBottom: SPACING.sm,
+    textAlign: "center",
   },
-  subtitle: {
+  description: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 24,
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.lg,
   },
-  permissions: {
-    gap: SPACING.md,
-  },
-  permissionCard: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    ...SHADOWS.sm,
-  },
-  permissionHeader: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  permissionIcon: {
-    fontSize: 32,
-  },
-  permissionInfo: {
-    flex: 1,
-  },
-  permissionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginBottom: SPACING.xs,
-  },
-  permissionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-  },
-  requiredBadge: {
-    backgroundColor: COLORS.error,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  requiredText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.surface,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-  },
-  permissionDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-  },
-  actions: {
-    gap: SPACING.md,
-  },
-  infoBox: {
-    backgroundColor: COLORS.accentLight,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  infoText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+
+  bottom: { gap: SPACING.lg },
+
+  dotsRow: { flexDirection: "row", justifyContent: "center", gap: 8 },
+  dot: { height: 8, borderRadius: 999 },
+  dotActive: { width: 32, backgroundColor: COLORS.primary },
+  dotInactive: { width: 8, backgroundColor: COLORS.border },
 });

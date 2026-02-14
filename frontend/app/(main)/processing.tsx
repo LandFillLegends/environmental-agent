@@ -1,276 +1,181 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
 import { useAppStore } from "@/store/useAppStore";
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "@/constants/theme";
-import { DISPOSAL_CATEGORIES } from '@/constants/disposal';
 
-type ProcessingStepDef = {
-  id: number;
-  text: string;
-  duration: number;
+type Step = {
+  id: string;
+  icon: string; // emoji icon for RN
+  label: string;
 };
 
-const PROCESSING_STEPS: ProcessingStepDef[] = [
-  { id: 1, text: "🔍 Identifying item...", duration: 1500 },
-  { id: 2, text: "📍 Checking local regulations...", duration: 1500 },
-  { id: 3, text: "🗺️ Finding nearby facilities...", duration: 1500 },
-  { id: 4, text: "✨ Generating recommendations...", duration: 1000 },
-];
-
-type RegulationSource = {
-  title: string;
-  url: string;
-};
-
-type DisposalResult = {
-  item: string | null;
-  category: "recycle" | "trash" | "compost" | "dropoff" | string;
-  instructions: string[];
-  reasoning: string;
-  regulationSource?: RegulationSource;
-  requiresDropoff: boolean;
-  confidence: number;
-};
-
-type StepRowProps = {
-  text: string;
-  isActive: boolean;
-  isComplete: boolean;
-};
-
-function ProcessingStep({ text, isActive, isComplete }: StepRowProps) {
-  const opacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (isActive || isComplete) {
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [isActive, isComplete, opacity]);
-
-  return (
-    <Animated.View
-      style={[
-        styles.step,
-        { opacity },
-        isActive && styles.stepActive,
-        isComplete && styles.stepComplete,
-      ]}
-    >
-      <View style={styles.stepIndicator}>
-        {isComplete ? (
-          <Text style={styles.stepCheck}>✓</Text>
-        ) : isActive ? (
-          <View style={styles.stepDot} />
-        ) : (
-          <View style={styles.stepDotInactive} />
-        )}
-      </View>
-
-      <Text
-        style={[
-          styles.stepText,
-          isActive && styles.stepTextActive,
-          isComplete && styles.stepTextComplete,
-        ]}
-      >
-        {text}
-      </Text>
-    </Animated.View>
-  );
-}
-
-export default function Processing() {
-  const router = useRouter();
-
-  const [currentStep, setCurrentStep] = useState<number>(0);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
+export default function ProcessingScreen() {
+  // Prefer URL param first, fallback to store
+  const { query } = useLocalSearchParams<{ query?: string }>();
   const currentItem = useAppStore((s) => s.currentItem);
-  const setDisposalResult = useAppStore((s) => s.setDisposalResult);
 
-  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const itemLabel = (typeof query === "string" && query) || currentItem || "Unknown item";
 
-  const totalDuration = useMemo(() => {
-    return PROCESSING_STEPS.reduce((sum, s) => sum + s.duration, 0);
-  }, []);
+  const steps = useMemo<Step[]>(
+    () => [
+      { id: "identify", icon: "🔎", label: "Identifying item..." },
+      { id: "rules", icon: "📍", label: "Checking local rules..." },
+      { id: "prep", icon: "✅", label: "Preparing guidance..." },
+    ],
+    []
+  );
+
+  const [currentStep, setCurrentStep] = useState(0);
+
+  // Spinner animation
+  const spin = useRef(new Animated.Value(0)).current;
+  const spinLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    // Animate in
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-
-    // Step through processing stages
-    let totalTime = 0;
-    PROCESSING_STEPS.forEach((step, index) => {
-      totalTime += step.duration;
-      const t = setTimeout(() => setCurrentStep(index + 1), totalTime);
-      timeoutsRef.current.push(t);
-    });
-
-    // Navigate to results after processing
-    const finalTimeout = setTimeout(() => {
-      const mockResult: DisposalResult = {
-        item: currentItem ?? null,
-        category: "recycle",
-        instructions: [
-          "Remove cap and rinse bottle",
-          "Check for recycling symbol #1 or #2",
-          "Place in blue recycling bin",
-          "Do not bag plastic bottles",
-        ],
-        reasoning:
-          "This plastic water bottle is made from PET plastic (#1), which is widely recyclable in Seattle. Your local facility accepts clean PET bottles.",
-        regulationSource: {
-          title: "Seattle Public Utilities - Recycling Guidelines",
-          url: "https://www.seattle.gov/utilities/recycling",
-        },
-        requiresDropoff: false,
-        confidence: 0.95,
-      };
-
-      setDisposalResult(mockResult);
-
-      // If Results lives in (main), use that path. If it's in tabs, change accordingly.
-      router.replace("/(main)/results");
-    }, totalDuration + 500);
-
-    timeoutsRef.current.push(finalTimeout);
+    spin.setValue(0);
+    spinLoopRef.current = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      })
+    );
+    spinLoopRef.current.start();
 
     return () => {
-      // Cleanup timers if user navigates away mid-process
-      timeoutsRef.current.forEach(clearTimeout);
-      timeoutsRef.current = [];
+      spinLoopRef.current?.stop();
     };
-  }, [currentItem, fadeAnim, router, setDisposalResult, totalDuration]);
+  }, [spin]);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setCurrentStep(1), 1200);
+    const t2 = setTimeout(() => setCurrentStep(2), 2400);
+    const t3 = setTimeout(() => {
+      // Pass query via params OR rely on store
+      router.replace({
+        pathname: "/(main)/results",
+        params: { query: itemLabel },
+      });
+    }, 3600);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [itemLabel]);
+
+  const rotate = spin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {/* Animation Area */}
-        <View style={styles.animationContainer}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.processingIcon}>🌍</Text>
-          </View>
+      <View style={styles.content}>
+        {/* Spinner */}
+        <Animated.View style={[styles.spinner, { transform: [{ rotate }] }]} />
 
-          <View style={styles.loadingBar}>
-            <View
-              style={[
-                styles.loadingProgress,
-                { width: `${(currentStep / PROCESSING_STEPS.length) * 100}%` },
-              ]}
-            />
-          </View>
-        </View>
+        <Text style={styles.title}>Analyzing</Text>
+        <Text style={styles.subtitle}>"{itemLabel}"</Text>
 
-        {/* Status Messages */}
-        <View style={styles.statusContainer}>
-          <Text style={styles.mainStatus}>Analyzing Your Item</Text>
-          <Text style={styles.itemName}>"{currentItem ?? ""}"</Text>
+        {/* Steps */}
+        <View style={styles.steps}>
+          {steps.map((step, i) => {
+            const isActive = i === currentStep;
+            const isDone = i < currentStep;
 
-          <View style={styles.stepsContainer}>
-            {PROCESSING_STEPS.map((step, index) => (
-              <ProcessingStep
+            return (
+              <View
                 key={step.id}
-                text={step.text}
-                isActive={currentStep === index + 1}
-                isComplete={currentStep > index}
-              />
-            ))}
-          </View>
-        </View>
+                style={[
+                  styles.stepRow,
+                  isActive && styles.stepActive,
+                  isDone && styles.stepDone,
+                  !isActive && !isDone && styles.stepDim,
+                ]}
+              >
+                <Text style={styles.stepIcon}>{isActive ? "⏳" : step.icon}</Text>
 
-        {/* Info */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            💡 Our AI is analyzing your item against local disposal regulations
-          </Text>
+                <Text
+                  style={[
+                    styles.stepText,
+                    (isActive || isDone) ? styles.stepTextOn : styles.stepTextOff,
+                  ]}
+                >
+                  {step.label}
+                </Text>
+
+                {isDone ? <Text style={styles.doneIcon}>✅</Text> : <View style={{ width: 18 }} />}
+              </View>
+            );
+          })}
         </View>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { flex: 1, padding: SPACING.lg, justifyContent: "space-around" },
-  animationContainer: { alignItems: "center", gap: SPACING.xl },
-  iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: COLORS.primary,
-    justifyContent: "center",
+  content: {
+    flex: 1,
     alignItems: "center",
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.lg,
   },
-  processingIcon: { fontSize: 64 },
-  loadingBar: {
-    width: "80%",
-    height: 6,
-    backgroundColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.round,
-    overflow: "hidden",
+
+  spinner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 4,
+    borderColor: COLORS.surfaceDark,
+    borderTopColor: COLORS.primary,
+    marginBottom: SPACING.xl,
+    ...SHADOWS.sm,
   },
-  loadingProgress: {
-    height: "100%",
-    backgroundColor: COLORS.accent,
-    borderRadius: BORDER_RADIUS.round,
-  },
-  statusContainer: { alignItems: "center", gap: SPACING.md },
-  mainStatus: {
-    fontSize: TYPOGRAPHY.fontSize.xxl,
+
+  title: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
-    textAlign: "center",
+    marginBottom: 4,
   },
-  itemName: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+  subtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
+    marginBottom: SPACING.xl,
     textAlign: "center",
-    fontStyle: "italic",
   },
-  stepsContainer: { width: "100%", gap: SPACING.sm, marginTop: SPACING.lg },
-  step: {
+
+  steps: {
+    width: "100%",
+    maxWidth: 360,
+    gap: SPACING.md,
+  },
+
+  stepRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.md,
     padding: SPACING.md,
     borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
+
   stepActive: { backgroundColor: COLORS.accentLight },
-  stepComplete: { backgroundColor: "transparent" },
-  stepIndicator: { width: 24, height: 24, justifyContent: "center", alignItems: "center" },
-  stepDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.primary },
-  stepDotInactive: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.border },
-  stepCheck: { fontSize: 16, color: COLORS.success },
-  stepText: { flex: 1, fontSize: TYPOGRAPHY.fontSize.md, color: COLORS.textLight },
-  stepTextActive: { color: COLORS.text, fontWeight: TYPOGRAPHY.fontWeight.medium },
-  stepTextComplete: { color: COLORS.textSecondary },
-  infoBox: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.accent,
-  },
-  infoText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
-  },
+  stepDone: { backgroundColor: COLORS.surface },
+  stepDim: { opacity: 0.45 },
+
+  stepIcon: { fontSize: 18 },
+  stepText: { flex: 1, fontSize: TYPOGRAPHY.fontSize.sm, fontWeight: TYPOGRAPHY.fontWeight.semibold },
+  stepTextOn: { color: COLORS.text },
+  stepTextOff: { color: COLORS.textSecondary },
+
+  doneIcon: { fontSize: 16 },
 });

@@ -1,250 +1,183 @@
 import React, { useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Switch } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
-import { Button } from "@/components/buttons";
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
 import { useAppStore } from "@/store/useAppStore";
-import {
-  COLORS,
-  SPACING,
-  TYPOGRAPHY,
-  BORDER_RADIUS,
-  SHADOWS,
-} from "@/constants/theme";
-import { DISPOSAL_CATEGORIES } from '@/constants/disposal';
+
+// If your Button component lives somewhere else, update this import.
+// Example alternatives:
+// import { Button } from "@/components/ui/Button";
+// import { Button } from "@/components/Button";
+import { Button } from "@/components/buttons";
+
+type WeatherType = "sunny" | "cloudy";
 
 type TimeSlot = {
-  id: number;
-  date: string;
+  day: string;
   time: string;
-  weather: string;
-  recommended?: boolean;
-  reason?: string;
+  weather: WeatherType;
+  temp: string;
+  label?: string | null;
 };
 
-type Facility = {
-  id?: number;
-  name?: string;
-  address?: string;
-  hours?: string;
-  distance?: string;
-};
-
-const MOCK_TIME_SLOTS: TimeSlot[] = [
-  {
-    id: 1,
-    date: "Thursday, Feb 15",
-    time: "4:00 PM - 5:00 PM",
-    weather: "☀️ 62°F",
-    recommended: true,
-    reason: "Best time based on your calendar",
-  },
-  {
-    id: 2,
-    date: "Friday, Feb 16",
-    time: "2:00 PM - 3:00 PM",
-    weather: "⛅ 58°F",
-  },
-  {
-    id: 3,
-    date: "Saturday, Feb 17",
-    time: "10:00 AM - 11:00 AM",
-    weather: "🌤️ 60°F",
-  },
+const TIME_SLOTS: TimeSlot[] = [
+  { day: "Thu, Feb 13", time: "4:00 PM", weather: "sunny", temp: "52°F", label: "Recommended" },
+  { day: "Fri, Feb 14", time: "10:00 AM", weather: "cloudy", temp: "47°F", label: null },
+  { day: "Sat, Feb 15", time: "2:00 PM", weather: "sunny", temp: "55°F", label: null },
 ];
 
-type TimeSlotCardProps = {
-  slot: TimeSlot;
-  isSelected: boolean;
-  onSelect: () => void;
+type Facility = {
+  name?: string;
+  hours?: string;
 };
 
-function TimeSlotCard({ slot, isSelected, onSelect }: TimeSlotCardProps) {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.timeSlot,
-        isSelected && styles.timeSlotSelected,
-        slot.recommended && styles.timeSlotRecommended,
-      ]}
-      onPress={onSelect}
-      activeOpacity={0.7}
-    >
-      {slot.recommended ? (
-        <View style={styles.recommendedBadge}>
-          <Text style={styles.recommendedText}>✨ Recommended</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.timeSlotContent}>
-        <View style={styles.timeSlotMain}>
-          <Text style={styles.timeSlotDate}>{slot.date}</Text>
-          <Text style={styles.timeSlotTime}>{slot.time}</Text>
-          {slot.reason ? (
-            <Text style={styles.timeSlotReason}>{slot.reason}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.timeSlotWeather}>
-          <Text style={styles.weatherText}>{slot.weather}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-type PreviewRowProps = { label: string; value: string };
-function PreviewRow({ label, value }: PreviewRowProps) {
-  return (
-    <View style={styles.previewRow}>
-      <Text style={styles.previewLabel}>{label}</Text>
-      <Text style={styles.previewValue}>{value}</Text>
-    </View>
-  );
-}
-
-type TipProps = { text: string };
-function Tip({ text }: TipProps) {
-  return (
-    <View style={styles.tip}>
-      <Text style={styles.tipBullet}>•</Text>
-      <Text style={styles.tipText}>{text}</Text>
-    </View>
-  );
-}
-
-export default function Schedule() {
-  const router = useRouter();
-
-  const [selectedSlot, setSelectedSlot] = useState<TimeSlot>(MOCK_TIME_SLOTS[0]);
-  const [addReminder, setAddReminder] = useState<boolean>(true);
-
+// If you pass facility through params: router.push({ pathname: "/(tabs)/schedule", params: { facility: JSON.stringify(facilityObj) } })
+export default function ScheduleScreen() {
+  const params = useLocalSearchParams<{ facility?: string }>();
   const addScheduledDropoff = useAppStore((s) => s.addScheduledDropoff);
 
-  // ✅ Read param from URL (sent from Dropoff as JSON string)
-  const { facility: facilityParam } = useLocalSearchParams<{ facility?: string }>();
-
-  const facility = useMemo<Facility>(() => {
-    if (!facilityParam) return {};
+  const facility: Facility = useMemo(() => {
+    if (!params.facility) return { name: "EcoStation North", hours: "Open Mon–Sat, 8:00 AM – 6:00 PM" };
     try {
-      return JSON.parse(facilityParam) as Facility;
+      return JSON.parse(params.facility);
     } catch {
-      return {};
+      return { name: "EcoStation North", hours: "Open Mon–Sat, 8:00 AM – 6:00 PM" };
     }
-  }, [facilityParam]);
+  }, [params.facility]);
+
+  const [selected, setSelected] = useState(0);
+  const [reminder, setReminder] = useState(true);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const selectedSlot = TIME_SLOTS[selected];
 
   const handleConfirm = () => {
-    const dropoff = {
+    // Save to store (mock “calendar add” for now)
+    addScheduledDropoff?.({
       id: Date.now(),
-      facility: facility.name ?? "Drop-off Facility",
-      address: facility.address ?? "",
-      date: selectedSlot.date,
+      facility: facility.name ?? "EcoStation North",
+      hours: facility.hours ?? "",
+      date: selectedSlot.day,
       time: selectedSlot.time,
-      reminder: addReminder,
-    };
+      reminder,
+    });
 
-    addScheduledDropoff(dropoff);
-
-    Alert.alert(
-      "✅ Event Created",
-      `Drop-off scheduled for ${selectedSlot.date} at ${selectedSlot.time}`,
-      [
-        {
-          text: "Done",
-          onPress: () => router.replace("/(tabs)/home"),
-        },
-      ]
-    );
+    setConfirmed(true);
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Schedule Drop-off</Text>
-      </View>
-
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        {/* Facility Summary */}
-        <View style={styles.facilityCard}>
-          <Text style={styles.facilityIcon}>📍</Text>
-          <View style={styles.facilityInfo}>
-            <Text style={styles.facilityName}>
-              {facility.name ?? "Selected Facility"}
-            </Text>
-            <Text style={styles.facilityAddress}>{facility.address ?? ""}</Text>
-            <Text style={styles.facilityHours}>🕐 {facility.hours ?? "Hours unavailable"}</Text>
+  if (confirmed) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.successWrap}>
+          <View style={styles.successCircle}>
+            <Text style={styles.successCheck}>✓</Text>
           </View>
+
+          <Text style={styles.successTitle}>All Set!</Text>
+          <Text style={styles.successSubtitle}>
+            Your drop-off is scheduled for {selectedSlot.day} at {selectedSlot.time}.
+          </Text>
+
+          {reminder ? (
+            <Text style={styles.reminderPill}>🔔 Reminder set</Text>
+          ) : null}
+
+          <Button
+            title="Back to Home"
+            onPress={() => router.replace("/(tabs)/home")}
+            size="large"
+            icon="🏠"
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backText}>← Back</Text>
+          </Pressable>
+
+          <Text style={styles.title}>Schedule Drop-Off</Text>
+          <Text style={styles.subtitle}>{facility.name ?? "EcoStation North"}</Text>
+          <Text style={styles.hours}>{facility.hours ?? "Open Mon–Sat, 8:00 AM – 6:00 PM"}</Text>
+        </View>
+
+        {/* Info Card */}
+        <View style={styles.infoCard}>
+          <Text style={styles.infoIcon}>📅</Text>
+          <Text style={styles.infoText}>
+            Pick a time that works for you. We'll add it to your calendar.
+          </Text>
         </View>
 
         {/* Time Slots */}
-        <View style={styles.slotsSection}>
-          <Text style={styles.sectionTitle}>Choose a Time Slot</Text>
+        <View style={styles.slotsWrap}>
+          {TIME_SLOTS.map((slot, i) => {
+            const isSelected = selected === i;
+            return (
+              <Pressable
+                key={`${slot.day}-${slot.time}`}
+                onPress={() => setSelected(i)}
+                style={[
+                  styles.slotCard,
+                  isSelected ? styles.slotSelected : styles.slotUnselected,
+                ]}
+              >
+                <View style={{ gap: 4 }}>
+                  <Text style={styles.slotDay}>{slot.day}</Text>
+                  <Text style={styles.slotTime}>🕒 {slot.time}</Text>
+                </View>
 
-          {MOCK_TIME_SLOTS.map((slot) => (
-            <TimeSlotCard
-              key={slot.id}
-              slot={slot}
-              isSelected={selectedSlot.id === slot.id}
-              onSelect={() => setSelectedSlot(slot)}
-            />
-          ))}
+                <View style={styles.slotRight}>
+                  <View style={styles.weatherWrap}>
+                    <Text style={styles.weatherIcon}>{slot.weather === "sunny" ? "☀️" : "☁️"}</Text>
+                    <Text style={styles.weatherTemp}>{slot.temp}</Text>
+                  </View>
+
+                  {slot.label ? (
+                    <View style={styles.recommendedPill}>
+                      <Text style={styles.recommendedText}>{slot.label}</Text>
+                    </View>
+                  ) : null}
+
+                  {isSelected ? (
+                    <View style={styles.selectedCheck}>
+                      <Text style={styles.selectedCheckText}>✓</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
 
-        {/* Calendar Preview */}
-        <View style={styles.previewCard}>
-          <Text style={styles.previewTitle}>📅 Calendar Event Preview</Text>
-          <View style={styles.previewContent}>
-            <PreviewRow label="Event" value="Drop-off at Recycling Center" />
-            <PreviewRow label="Location" value={facility.name ?? "Facility"} />
-            <PreviewRow
-              label="Date & Time"
-              value={`${selectedSlot.date}, ${selectedSlot.time}`}
-            />
-            <PreviewRow label="Travel Time" value="~8 minutes" />
+        {/* Reminder */}
+        <View style={styles.reminderCard}>
+          <View style={styles.reminderLeft}>
+            <Text style={styles.reminderIcon}>🔔</Text>
+            <Text style={styles.reminderLabel}>Set reminder</Text>
           </View>
+          <Switch value={reminder} onValueChange={setReminder} />
         </View>
 
-        {/* Reminder Option */}
-        <TouchableOpacity
-          style={styles.reminderOption}
-          onPress={() => setAddReminder((v) => !v)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.reminderCheckbox}>
-            {addReminder ? <Text style={styles.reminderCheck}>✓</Text> : null}
-          </View>
-          <View style={styles.reminderInfo}>
-            <Text style={styles.reminderTitle}>Add Reminder</Text>
-            <Text style={styles.reminderDescription}>
-              Get notified 1 hour before your drop-off time
-            </Text>
-          </View>
-        </TouchableOpacity>
+        {/* Confirm */}
+        <Button title="Add to Calendar" onPress={handleConfirm} size="large" icon="✓" />
 
-        {/* Tips */}
-        <View style={styles.tipsCard}>
-          <Text style={styles.tipsTitle}>💡 Before You Go</Text>
-          <Tip text="Bring a valid ID if required" />
-          <Tip text="Keep items separated if needed" />
-          <Tip text="Check facility website for any updates" />
+        {/* Before You Go */}
+        <View style={styles.beforeCard}>
+          <Text style={styles.beforeTitle}>📌 Before You Go</Text>
+          <Text style={styles.beforeItem}>• Bring a valid ID if required</Text>
+          <Text style={styles.beforeItem}>• Keep items separated if needed</Text>
+          <Text style={styles.beforeItem}>• Check facility website for any updates</Text>
         </View>
       </ScrollView>
-
-      {/* Bottom Action */}
-      <View style={styles.bottomAction}>
-        <Button title="Add to Calendar" onPress={handleConfirm} size="large" icon="✓" />
-      </View>
     </SafeAreaView>
   );
 }
@@ -252,173 +185,193 @@ export default function Schedule() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
 
-  header: {
+  content: {
     padding: SPACING.lg,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    gap: SPACING.lg,
+    paddingBottom: SPACING.xxl,
   },
-  backButton: { marginBottom: SPACING.sm },
+
+  header: { gap: 6 },
+  backBtn: { alignSelf: "flex-start" },
   backText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.primary,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   title: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
   },
+  subtitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.textSecondary,
+  },
+  hours: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+  },
 
-  scrollView: { flex: 1 },
-  content: { padding: SPACING.lg, gap: SPACING.lg, paddingBottom: 100 },
-
-  facilityCard: {
-    flexDirection: "row",
-    backgroundColor: COLORS.surface,
+  infoCard: {
+    backgroundColor: COLORS.accentLight,
+    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
+    flexDirection: "row",
+    alignItems: "center",
     gap: SPACING.md,
-    ...SHADOWS.sm,
   },
-  facilityIcon: { fontSize: 32 },
-  facilityInfo: { flex: 1, gap: SPACING.xs },
-  facilityName: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+  infoIcon: { fontSize: 18 },
+  infoText: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text,
-  },
-  facilityAddress: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
-  facilityHours: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
-
-  slotsSection: { gap: SPACING.md },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
+    lineHeight: 20,
   },
 
-  timeSlot: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
+  slotsWrap: { gap: SPACING.md },
+
+  slotCard: {
+    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
     borderWidth: 2,
-    borderColor: COLORS.border,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     ...SHADOWS.sm,
   },
-  timeSlotSelected: { borderColor: COLORS.primary, ...SHADOWS.md },
-  timeSlotRecommended: { borderColor: COLORS.accent },
-
-  recommendedBadge: {
-    backgroundColor: COLORS.accent,
+  slotSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.accentLight,
+  },
+  slotUnselected: {
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  slotDay: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+  },
+  slotTime: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+  },
+  slotRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  weatherWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
+  weatherIcon: { fontSize: 16 },
+  weatherTemp: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.textSecondary,
+  },
+  recommendedPill: {
+    backgroundColor: COLORS.accentLight,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.sm,
-    alignSelf: "flex-start",
-    marginBottom: SPACING.sm,
+    borderRadius: BORDER_RADIUS.round,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   recommendedText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-  },
-
-  timeSlotContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  timeSlotMain: { flex: 1 },
-
-  timeSlotDate: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
-  },
-  timeSlotTime: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.primary,
-    marginBottom: SPACING.xs,
   },
-  timeSlotReason: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
-  timeSlotWeather: { alignItems: "flex-end" },
-  weatherText: { fontSize: TYPOGRAPHY.fontSize.md },
-
-  previewCard: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    gap: SPACING.md,
-    ...SHADOWS.sm,
-  },
-  previewTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-  },
-  previewContent: { gap: SPACING.sm },
-
-  previewRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: SPACING.xs },
-  previewLabel: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
-  previewValue: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text,
-    textAlign: "right",
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-
-  reminderOption: {
-    flexDirection: "row",
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    gap: SPACING.md,
-    ...SHADOWS.sm,
-  },
-  reminderCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    justifyContent: "center",
+  selectedCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: BORDER_RADIUS.round,
+    backgroundColor: COLORS.primary,
     alignItems: "center",
+    justifyContent: "center",
   },
-  reminderCheck: { fontSize: 14, color: COLORS.primary, fontWeight: TYPOGRAPHY.fontWeight.bold },
-  reminderInfo: { flex: 1 },
-  reminderTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
+  selectedCheckText: {
+    color: COLORS.surface,
+    fontSize: 12,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
   },
-  reminderDescription: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
 
-  tipsCard: {
-    backgroundColor: COLORS.accentLight,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    gap: SPACING.sm,
-  },
-  tipsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
-  },
-  tip: { flexDirection: "row", gap: SPACING.sm },
-  tipBullet: { fontSize: TYPOGRAPHY.fontSize.md, color: COLORS.text },
-  tipText: { flex: 1, fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.text, lineHeight: 20 },
-
-  bottomAction: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+  reminderCard: {
     backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     padding: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    ...SHADOWS.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    ...SHADOWS.sm,
+  },
+  reminderLeft: { flexDirection: "row", alignItems: "center", gap: SPACING.md },
+  reminderIcon: { fontSize: 18 },
+  reminderLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+  },
+
+  beforeCard: {
+    backgroundColor: COLORS.accentLight,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    gap: SPACING.xs,
+  },
+  beforeTitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  beforeItem: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text,
+    lineHeight: 20,
+  },
+
+  // Success
+  successWrap: {
+    flex: 1,
+    padding: SPACING.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.md,
+  },
+  successCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: BORDER_RADIUS.round,
+    backgroundColor: COLORS.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACING.sm,
+  },
+  successCheck: {
+    fontSize: 38,
+    color: COLORS.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+  },
+  successTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xxl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+  },
+  successSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: SPACING.sm,
+  },
+  reminderPill: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.primary,
+    marginBottom: SPACING.lg,
   },
 });

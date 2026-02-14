@@ -1,90 +1,91 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Linking,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import { router, useLocalSearchParams } from "expo-router";
 
-import { Button } from "@/components/buttons"; // or default import if needed
-import { DisposalBadge } from "@/components/disposalBadge"; // or default import if needed
-import { useAppStore } from "@/store/useAppStore";
+import { Button } from "@/components/buttons";
+import { DisposalBadge } from "@/components/disposalBadge";
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
-import { DISPOSAL_CATEGORIES } from '@/constants/disposal';
+import { DISPOSAL_CATEGORIES } from "@/constants/disposal";
 
-type RegulationSource = {
-  title: string;
-  url: string;
-};
 
-type DisposalResult = {
+type DisposalType = keyof typeof DISPOSAL_CATEGORIES;
+
+type Result = {
   item: string;
-  category: string;
-  instructions: string[];
-  reasoning: string;
-  regulationSource?: RegulationSource;
-  requiresDropoff: boolean;
-  confidence: number; // 0..1
+  type: DisposalType;
+  steps: string[];
+  reason: string;
+  source: string;
+  needsDropoff: boolean;
 };
 
-type HistoryEntry = {
-  id: number;
-  item: string;
-  category: string;
-  timestamp: Date;
-};
-
-type TipProps = { text: string };
-
-function Tip({ text }: TipProps) {
-  return (
-    <View style={styles.tip}>
-      <Text style={styles.tipBullet}>•</Text>
-      <Text style={styles.tipText}>{text}</Text>
-    </View>
-  );
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function Results() {
-  const router = useRouter();
-  const [showReasoning, setShowReasoning] = useState<boolean>(false);
+export default function ResultsScreen() {
+  const { query } = useLocalSearchParams<{ query?: string }>();
+  const itemQuery = typeof query === "string" && query ? query : "Pizza Box";
 
-  const disposalResult = useAppStore((s) => s.disposalResult) as DisposalResult | null;
-  const clearCurrentRequest = useAppStore((s) => s.clearCurrentRequest);
-  const addToHistory = useAppStore((s) => s.addToHistory);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
-  if (!disposalResult) return null;
+  const mockResults = useMemo<Result[]>(
+    () => [
+      {
+        item: "Pizza Box",
+        type: "recycle",
+        steps: [
+          "Remove any leftover food or grease-soaked parts",
+          "Tear off the clean lid — that part is recyclable",
+          "Place the clean cardboard in your blue recycling bin",
+          "Compost the greasy bottom if composting is available",
+        ],
+        reason:
+          "Seattle Municipal Code 21.36.082 — Cardboard is accepted in curbside recycling only if clean and dry.",
+        source:
+          "https://www.seattle.gov/utilities/your-services/collection-and-disposal/where-does-it-go",
+        needsDropoff: false,
+      },
+      {
+        item: "Batteries (AA)",
+        type: "hazardous",
+        steps: [
+          "Do NOT place in regular trash or recycling",
+          "Tape the terminals with clear tape for safety",
+          "Bring to a household hazardous waste facility",
+          "Check accepted battery types at the facility",
+        ],
+        reason:
+          "Batteries contain heavy metals and must be disposed at designated collection points per EPA guidelines.",
+        source: "https://www.epa.gov/recycle/used-household-batteries",
+        needsDropoff: true,
+      },
+    ],
+    []
+  );
 
-  const handleDone = () => {
-    const entry: HistoryEntry = {
-      id: Date.now(),
-      item: disposalResult.item,
-      category: disposalResult.category,
-      timestamp: new Date(),
-    };
-
-    addToHistory(entry);
-    clearCurrentRequest();
-
-    // Home usually lives in tabs
-    router.replace("/(tabs)/home");
-    // If your Home is in (main), use: router.replace("/(main)/home");
+  const toggleWhy = (idx: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedIdx((prev) => (prev === idx ? null : idx));
   };
 
-  const handleDropoff = () => {
-    router.push("/(main)/dropoff");
-  };
-
-  const handleOpenSource = async () => {
-    if (!disposalResult.regulationSource?.url) return;
-
-    const url = disposalResult.regulationSource.url;
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) await Linking.openURL(url);
+  const openSource = async (url: string) => {
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      // optional: show alert
+    }
   };
 
   return (
@@ -92,102 +93,84 @@ export default function Results() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.successIcon}>✅</Text>
-          <Text style={styles.title}>Disposal Method Found!</Text>
-        </View>
-
-        {/* Result Card */}
-        <View style={styles.resultCard}>
-          <View style={styles.resultHeader}>
-            <Text style={styles.itemName}>{disposalResult.item}</Text>
-            <DisposalBadge category={disposalResult.category} size="large" />
-          </View>
-
-          {/* Confidence Badge */}
-          <View style={styles.confidenceBadge}>
-            <Text style={styles.confidenceText}>
-              {Math.round(disposalResult.confidence * 100)}% Confident
-            </Text>
-          </View>
-
-          {/* Instructions */}
-          <View style={styles.instructionsSection}>
-            <Text style={styles.sectionTitle}>How to Dispose</Text>
-            {disposalResult.instructions.map((instruction, index) => (
-              <View key={`${instruction}-${index}`} style={styles.instructionItem}>
-                <View style={styles.instructionNumber}>
-                  <Text style={styles.instructionNumberText}>{index + 1}</Text>
-                </View>
-                <Text style={styles.instructionText}>{instruction}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Why Section */}
-          <TouchableOpacity
-            style={styles.whySection}
-            onPress={() => setShowReasoning((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.whyHeader}>
-              <Text style={styles.whyTitle}>💡 Why this method?</Text>
-              <Text style={styles.whyArrow}>{showReasoning ? "▼" : "▶"}</Text>
-            </View>
-
-            {showReasoning ? (
-              <View style={styles.whyContent}>
-                <Text style={styles.whyText}>{disposalResult.reasoning}</Text>
-
-                {disposalResult.regulationSource ? (
-                  <TouchableOpacity style={styles.sourceLink} onPress={handleOpenSource}>
-                    <Text style={styles.sourceLinkText}>
-                      📄 {disposalResult.regulationSource.title}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            ) : null}
+          <TouchableOpacity onPress={() => router.replace("/(tabs)/home")} style={styles.backBtn}>
+            <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
+
+          <Text style={styles.subtitle}>Results for</Text>
+          <Text style={styles.title}>"{itemQuery}"</Text>
         </View>
 
-        {/* Drop-off Alert if needed */}
-        {disposalResult.requiresDropoff ? (
-          <View style={styles.dropoffAlert}>
-            <Text style={styles.dropoffIcon}>📍</Text>
-            <View style={styles.dropoffContent}>
-              <Text style={styles.dropoffTitle}>Drop-off Required</Text>
-              <Text style={styles.dropoffText}>
-                This item needs to be taken to a special facility
-              </Text>
+        {/* Results Cards */}
+        <View style={styles.cards}>
+          {mockResults.map((result, i) => (
+            <View key={`${result.item}-${i}`} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{result.item}</Text>
+                <DisposalBadge category={result.type} size="large" />
+              </View>
+
+              {/* Steps */}
+              <View style={styles.steps}>
+                {result.steps.map((step, j) => (
+                  <View key={`${i}-step-${j}`} style={styles.stepRow}>
+                    <View style={styles.stepNum}>
+                      <Text style={styles.stepNumText}>{j + 1}</Text>
+                    </View>
+                    <Text style={styles.stepText}>{step}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Why toggle */}
+              <TouchableOpacity onPress={() => toggleWhy(i)} style={styles.whyBtn} activeOpacity={0.7}>
+                <Text style={styles.whyText}>
+                  Why? {expandedIdx === i ? "▲" : "▼"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Why content */}
+              {expandedIdx === i && (
+                <View style={styles.whyBox}>
+                  <Text style={styles.reasonText}>{result.reason}</Text>
+
+                  <TouchableOpacity onPress={() => openSource(result.source)} activeOpacity={0.7}>
+                    <Text style={styles.sourceLink}>View source ↗</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Drop-off CTA */}
+              {result.needsDropoff && (
+                <View style={styles.dropoffCta}>
+                  <Button
+                    title="Find Drop-Off Location"
+                    onPress={() => router.push("/(tabs)/dropoff")}
+                    variant="outline"
+                    size="large"
+                    icon="📍"
+                  />
+                </View>
+              )}
             </View>
-            <Button
-              title="Find Locations"
-              onPress={handleDropoff}
-              variant="secondary"
-              size="small"
-            />
-          </View>
-        ) : null}
-
-        {/* Actions */}
-        <View style={styles.actions}>
-          {disposalResult.requiresDropoff ? (
-            <>
-              <Button title="Schedule Drop-off" onPress={handleDropoff} size="large" icon="📅" />
-              <Button title="Done" onPress={handleDone} variant="outline" size="medium" />
-            </>
-          ) : (
-            <Button title="Done - Return Home" onPress={handleDone} size="large" icon="✓" />
-          )}
+          ))}
         </View>
 
-        {/* Tips */}
-        <View style={styles.tipsSection}>
+        {/* Eco Tips */}
+        <View style={styles.tipsCard}>
           <Text style={styles.tipsTitle}>💚 Eco Tips</Text>
-          <Tip text="Consider reusable alternatives to reduce waste" />
-          <Tip text="Clean recyclables to prevent contamination" />
-          <Tip text="Check with your building for specific guidelines" />
+          <Text style={styles.tipLine}>• Consider reusable alternatives to reduce waste</Text>
+          <Text style={styles.tipLine}>• Clean recyclables to prevent contamination</Text>
+          <Text style={styles.tipLine}>• Check with your building for specific guidelines</Text>
         </View>
+
+        {/* New Search */}
+        <Button
+          title="Search Another Item"
+          onPress={() => router.replace("/(tabs)/home")}
+          variant="outline"
+          size="large"
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -197,100 +180,88 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollView: { flex: 1 },
   content: { padding: SPACING.lg, gap: SPACING.lg },
-  header: { alignItems: "center", gap: SPACING.md },
-  successIcon: { fontSize: 64 },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize.xxl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text,
-    textAlign: "center",
+
+  header: { gap: 4 },
+  backBtn: { marginBottom: SPACING.sm },
+  backText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
-  resultCard: {
+  subtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  title: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: COLORS.text,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+  },
+
+  cards: { gap: SPACING.md },
+
+  card: {
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
-    gap: SPACING.lg,
+    gap: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     ...SHADOWS.md,
   },
-  resultHeader: { gap: SPACING.md },
-  itemName: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", gap: SPACING.md },
+  cardTitle: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.text,
   },
-  confidenceBadge: {
-    backgroundColor: COLORS.accentLight,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.round,
-    alignSelf: "flex-start",
-  },
-  confidenceText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-  },
-  instructionsSection: { gap: SPACING.md },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-  },
-  instructionItem: { flexDirection: "row", gap: SPACING.md, alignItems: "flex-start" },
-  instructionNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.primary,
+
+  steps: { gap: SPACING.sm },
+  stepRow: { flexDirection: "row", alignItems: "flex-start", gap: SPACING.md },
+  stepNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.surfaceDark,
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 2,
   },
-  instructionNumberText: {
+  stepNumText: { fontSize: 12, fontWeight: "700", color: COLORS.text },
+  stepText: { flex: 1, fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.text, lineHeight: 20 },
+
+  whyBtn: { alignSelf: "flex-start" },
+  whyText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.surface,
-  },
-  instructionText: { flex: 1, fontSize: TYPOGRAPHY.fontSize.md, color: COLORS.text, lineHeight: 24 },
-  whySection: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: SPACING.md },
-  whyHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  whyTitle: { fontSize: TYPOGRAPHY.fontSize.md, fontWeight: TYPOGRAPHY.fontWeight.semibold, color: COLORS.primary },
-  whyArrow: { fontSize: 12, color: COLORS.textSecondary },
-  whyContent: { marginTop: SPACING.md, gap: SPACING.md },
-  whyText: { fontSize: TYPOGRAPHY.fontSize.md, color: COLORS.textSecondary, lineHeight: 24 },
-  sourceLink: { backgroundColor: COLORS.background, padding: SPACING.md, borderRadius: BORDER_RADIUS.sm },
-  sourceLinkText: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.primary, fontWeight: TYPOGRAPHY.fontWeight.medium },
-  dropoffAlert: {
-    backgroundColor: `${COLORS.warning}20`,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.warning,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-  },
-  dropoffIcon: { fontSize: 32 },
-  dropoffContent: { flex: 1 },
-  dropoffTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
+    color: COLORS.primary,
   },
-  dropoffText: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary },
-  actions: { gap: SPACING.md },
-  tipsSection: {
+
+  whyBox: {
+    backgroundColor: COLORS.surfaceDark,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+  },
+  reasonText: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary, lineHeight: 20 },
+  sourceLink: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.primary,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+  },
+
+  dropoffCta: { marginTop: SPACING.sm },
+
+  tipsCard: {
     backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    gap: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: SPACING.sm,
   },
-  tipsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text,
-  },
-  tip: { flexDirection: "row", gap: SPACING.sm },
-  tipBullet: { fontSize: TYPOGRAPHY.fontSize.md, color: COLORS.accent, fontWeight: TYPOGRAPHY.fontWeight.bold },
-  tipText: { flex: 1, fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary, lineHeight: 20 },
+  tipsTitle: { fontSize: TYPOGRAPHY.fontSize.md, fontWeight: TYPOGRAPHY.fontWeight.bold, color: COLORS.text },
+  tipLine: { fontSize: TYPOGRAPHY.fontSize.sm, color: COLORS.textSecondary, lineHeight: 20 },
 });
