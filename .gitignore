@@ -1,4 +1,14 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# Python
+__pycache__/
+venv/
+.venv/
+*.py[cod]
+.env
+
+# Node / Expo
+node_modules/
+.expo/
+dist/# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
 node_modules/
