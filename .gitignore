@@ -3,7 +3,25 @@ __pycache__/
 venv/
 .venv/
 *.py[cod]
+*$py.class
+*.so
+.Python
 .env
+*.db
+*.sqlite3
+
+# Database
+*.db-journal
+
+# Alembic
+alembic/versions/*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Node / Expo
 node_modules/
