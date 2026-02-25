@@ -1,9 +1,30 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# Python
+__pycache__/
+venv/
+.venv/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+*.db
+*.sqlite3
 
-# dependencies
+# Database
+*.db-journal
+
+# Alembic
+alembic/versions/*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node / Expo
 node_modules/
-
-# Expo
 .expo/
 dist/
 web-build/
@@ -39,5 +60,5 @@ yarn-error.*
 app-example
 
 # generated native folders
-/ios
-/android
+/frontend/ios
+/frontend/android
