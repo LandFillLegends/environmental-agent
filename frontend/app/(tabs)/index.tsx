@@ -21,7 +21,7 @@ import { ClassificationResultsSheet } from '@/components/classification-results-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { classifyWasteInput } from '@/services/api';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import type { ClassificationResponse } from '@/types/classification';
 
 export default function HomeScreen() {
@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [results, setResults] = useState<ClassificationResponse | null>(null);
   const [message, setMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const textColor = useThemeColor({}, 'text');
 
   // When we navigate back from the camera with results, parse and show them
   useEffect(() => {
@@ -52,21 +52,13 @@ export default function HomeScreen() {
     router.push('/camera');
   }, []);
 
-  const handleTextSubmit = useCallback(async () => {
+  const handleTextSubmit = useCallback(() => {
     if (!message.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsLoading(true);
-    try {
-      const result = await classifyWasteInput({ message });
-      setResults(result);
-      setTimeout(() => {
-        bottomSheetRef.current?.expand();
-      }, 300);
-    } catch (e) {
-      console.error('Failed to classify text:', e);
-    } finally {
-      setIsLoading(false);
-    }
+    router.push({
+      pathname: '/loading',
+      params: { message: message.trim() },
+    });
   }, [message]);
 
   const handleSheetClose = useCallback(() => {
@@ -98,23 +90,24 @@ export default function HomeScreen() {
         <ThemedText style={styles.orText}>or</ThemedText>
 
         <TextInput
-          style={styles.textInput}
+          style={[styles.textInput, { color: textColor }]}
           placeholder="Describe your waste item..."
+          placeholderTextColor={`${textColor}80`}
           value={message}
           onChangeText={setMessage}
           multiline
         />
 
-        <TouchableOpacity
-          style={[styles.scanButton, !message.trim() && styles.disabledButton]}
-          onPress={handleTextSubmit}
-          disabled={!message.trim() || isLoading}
-          activeOpacity={0.8}
-        >
-          <ThemedText style={styles.scanButtonText}>
-            {isLoading ? 'Classifying...' : 'Describe Waste'}
-          </ThemedText>
-        </TouchableOpacity>
+        <View style={styles.scanSection}>
+          <TouchableOpacity
+            style={[styles.scanButton, !message.trim() && styles.disabledButton]}
+            onPress={handleTextSubmit}
+            disabled={!message.trim()}
+            activeOpacity={0.8}
+          >
+            <ThemedText style={styles.scanButtonText}>Describe Waste</ThemedText>
+          </TouchableOpacity>
+        </View>
 
         {/* How it works */}
         <View style={styles.infoSection}>
