@@ -11,13 +11,13 @@
  * 4. Navigate back to home with the results
  */
 
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
 
-import { WasteCamera } from '@/components/waste-camera';
 import { ThemedText } from '@/components/themed-text';
-import { classifyWasteImage } from '@/services/api';
+import { WasteCamera } from '@/components/waste-camera';
+import { classifyWasteInput } from '@/services/api';
 
 export default function CameraScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -26,7 +26,7 @@ export default function CameraScreen() {
     setIsProcessing(true);
 
     try {
-      const response = await classifyWasteImage({ image_base64: base64Image });
+      const response = await classifyWasteInput({ image_base64: base64Image });
 
       // Navigate back to home and pass the results as URL params.
       // We JSON-stringify the data since Expo Router params are strings.

@@ -16,7 +16,7 @@ const API_BASE_URL = __DEV__
   ? 'http://localhost:8000'
   : 'https://api.landfilllegends.com';
 
-export async function classifyWasteImage(
+export async function classifyWasteInput(
   request: ClassificationRequest,
 ): Promise<ClassificationResponse> {
   // TODO: Replace with real OAuth token once your friend's branch is merged

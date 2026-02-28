@@ -10,22 +10,26 @@
  * 3. This screen receives results via route params and opens the bottom sheet
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { styles } from '@/styles/index.styles';
 import BottomSheet from '@gorhom/bottom-sheet';
+import * as Haptics from 'expo-haptics';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { TextInput, TouchableOpacity, View } from 'react-native';
 
+import { ClassificationResultsSheet } from '@/components/classification-results-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ClassificationResultsSheet } from '@/components/classification-results-sheet';
+import { classifyWasteInput } from '@/services/api';
 import type { ClassificationResponse } from '@/types/classification';
 
 export default function HomeScreen() {
   const params = useLocalSearchParams<{ classificationResult?: string }>();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [results, setResults] = useState<ClassificationResponse | null>(null);
+  const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // When we navigate back from the camera with results, parse and show them
   useEffect(() => {
@@ -48,6 +52,23 @@ export default function HomeScreen() {
     router.push('/camera');
   }, []);
 
+  const handleTextSubmit = useCallback(async () => {
+    if (!message.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsLoading(true);
+    try {
+      const result = await classifyWasteInput({ message });
+      setResults(result);
+      setTimeout(() => {
+        bottomSheetRef.current?.expand();
+      }, 300);
+    } catch (e) {
+      console.error('Failed to classify text:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [message]);
+
   const handleSheetClose = useCallback(() => {
     setResults(null);
   }, []);
@@ -63,11 +84,37 @@ export default function HomeScreen() {
 
         {/* Scan button */}
         <View style={styles.scanSection}>
-          <TouchableOpacity style={styles.scanButton} onPress={handleScanPress} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={[styles.scanButton, !!message.trim() && styles.disabledButton]}
+            onPress={handleScanPress}
+            activeOpacity={0.8}
+            disabled={!!message.trim()}
+          >
             <IconSymbol name="camera.fill" size={32} color="#fff" />
             <ThemedText style={styles.scanButtonText}>Scan Waste</ThemedText>
           </TouchableOpacity>
         </View>
+
+        <ThemedText style={styles.orText}>or</ThemedText>
+
+        <TextInput
+          style={styles.textInput}
+          placeholder="Describe your waste item..."
+          value={message}
+          onChangeText={setMessage}
+          multiline
+        />
+
+        <TouchableOpacity
+          style={[styles.scanButton, !message.trim() && styles.disabledButton]}
+          onPress={handleTextSubmit}
+          disabled={!message.trim() || isLoading}
+          activeOpacity={0.8}
+        >
+          <ThemedText style={styles.scanButtonText}>
+            {isLoading ? 'Classifying...' : 'Describe Waste'}
+          </ThemedText>
+        </TouchableOpacity>
 
         {/* How it works */}
         <View style={styles.infoSection}>
@@ -76,7 +123,7 @@ export default function HomeScreen() {
           </ThemedText>
           <View style={styles.step}>
             <ThemedText style={styles.stepNumber}>1</ThemedText>
-            <ThemedText style={styles.stepText}>Take a photo of waste items</ThemedText>
+            <ThemedText style={styles.stepText}>Take a photo or describe your waste items</ThemedText>
           </View>
           <View style={styles.step}>
             <ThemedText style={styles.stepNumber}>2</ThemedText>
@@ -101,75 +148,3 @@ export default function HomeScreen() {
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  tagline: {
-    opacity: 0.6,
-    fontSize: 16,
-    marginTop: 4,
-  },
-  scanSection: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  scanButton: {
-    backgroundColor: '#0a7ea4',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 18,
-    paddingHorizontal: 40,
-    borderRadius: 16,
-    width: '100%',
-    maxWidth: 300,
-  },
-  scanButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  infoSection: {
-    backgroundColor: 'rgba(10, 126, 164, 0.08)',
-    padding: 20,
-    borderRadius: 16,
-  },
-  infoTitle: {
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  step: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#0a7ea4',
-    color: '#fff',
-    textAlign: 'center',
-    lineHeight: 28,
-    fontSize: 14,
-    fontWeight: '700',
-    overflow: 'hidden',
-  },
-  stepText: {
-    flex: 1,
-    fontSize: 15,
-  },
-});
