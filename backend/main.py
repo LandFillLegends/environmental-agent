@@ -1,29 +1,23 @@
 from fastapi import FastAPI
-from langgraph.graph import MessageGraph
-from typing import List
+from fastapi.middleware.cors import CORSMiddleware
+from app.routes.classification import router as classification_router
 
 # 1. Create the FastAPI app
-app = FastAPI()
+app = FastAPI(title="Landfill Legends API", version="1.0.0")
 
-# 2. Define the LangGraph "Brain"
-# This is a simple graph that just takes a message and adds a response
-builder = MessageGraph()
-builder.add_node("oracle", lambda state: "Hello! Your backend is officially alive.")
-builder.set_entry_point("oracle")
-builder.set_finish_point("oracle")
+# 2. CORS — allows the React Native frontend to talk to this server.
+#    In production, replace "*" with your actual frontend URL.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Compile the graph so it's ready to run
-agent = builder.compile()
-
-# 3. Create the API Endpoint
-@app.get("/chat")
-async def chat_with_agent():
-    # We invoke the graph with a starting message
-    result = await agent.ainvoke("Hi")
-    
-    # LangGraph returns the full list of messages, 
-    # so we grab the last one to send to the frontend
-    return {"reply": result[-1]}
+# 3. Register routers — each router is a group of related endpoints.
+#    The classification router adds POST /api/v1/classify
+app.include_router(classification_router)
 
 @app.get("/")
 def home():
