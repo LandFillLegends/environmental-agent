@@ -15,10 +15,10 @@
  * - Close button
  */
 
+import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
 import { useRef, useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -34,6 +34,7 @@ interface WasteCameraProps {
 export function WasteCamera({ onCapture, onClose }: WasteCameraProps) {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
+  const [isCaptured, setIsCaptured] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
   // Permission state is loading
@@ -64,24 +65,27 @@ export function WasteCamera({ onCapture, onClose }: WasteCameraProps) {
 
   // Take a picture and pass the base64 data to the parent
   const handleCapture = async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || isCaptured) return;
+    setIsCaptured(true);
 
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.7, // 70% quality — good balance between size and clarity
+        quality: 0.7,
       });
 
       if (photo?.base64) {
         onCapture(photo.base64);
       } else {
         Alert.alert('Error', 'Failed to capture image. Please try again.');
+        setIsCaptured(false);
       }
     } catch (error) {
       console.error('Camera capture error:', error);
       Alert.alert('Error', 'Something went wrong while taking the picture.');
+      setIsCaptured(false);
     }
   };
 
@@ -115,7 +119,7 @@ export function WasteCamera({ onCapture, onClose }: WasteCameraProps) {
               <IconSymbol name="arrow.triangle.2.circlepath.camera" size={28} color="#fff" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.captureButton} onPress={handleCapture}>
+            <TouchableOpacity style={[styles.captureButton, isCaptured && { opacity: 0.5 }]} onPress={handleCapture} disabled={isCaptured}>
               <View style={styles.captureButtonInner} />
             </TouchableOpacity>
 

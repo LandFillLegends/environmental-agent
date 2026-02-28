@@ -21,8 +21,9 @@ class DisposalInstruction(BaseModel):
 
 
 class ClassificationRequest(BaseModel):
-    """What the frontend sends: a base64 image and optional location."""
-    image_base64: str = Field(..., description="Base64-encoded image (JPEG or PNG)")
+    """What the frontend sends: a base64 image or text and optional location."""
+    image_base64: Optional[str] = Field(None, description="Base64-encoded image (JPEG or PNG)")
+    message: Optional[str] = Field(None, description="Text description of waste item(s)")
     location: Optional[str] = Field(None, description="User's location for localized disposal rules")
 
 
