@@ -21,7 +21,8 @@ export interface DisposalInstruction {
 }
 
 export interface ClassificationRequest {
-  image_base64: string;
+  image_base64?: string | null;
+  message?: string | null;
   location?: string | null;
 }
 

@@ -1,17 +1,18 @@
 """
 Waste classification API routes.
 
-POST /api/v1/classify  — accepts a base64 image, returns classification + disposal instructions
+POST /api/v1/classify  — accepts a base64 image or text, invokes agenti loop, returns classification + disposal instructions
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+import time
 
 from app.core.auth import verify_google_token
 from app.schemas.classification import (
     ClassificationRequest,
     ClassificationResponse,
 )
-from app.services.gemini_service import GeminiClassificationService
+from app.services.agent import agent
 
 # Create a router with a URL prefix and a tag (shows up in auto-generated docs)
 router = APIRouter(prefix="/api/v1", tags=["classification"])
@@ -34,22 +35,26 @@ async def classify_waste_image(
     The 'user' param is injected by the auth dependency — you can use it
     to log who made the request, rate-limit per user, etc.
     """
+    start_time = time.time()
+
     try:
-        service = GeminiClassificationService()
-        items, instructions, processing_time = await service.classify_and_advise(
-            image_base64=request.image_base64,
-            user_location=request.location,
-        )
+        result = await agent.ainvoke({
+            "image_base64": request.image_base64,
+            "message": request.message,
+            "location": request.location,
+        })
+
+        processing_time_ms = (time.time() - start_time) * 1000
 
         return ClassificationResponse(
-            items=items,
-            disposal_instructions=instructions,
-            total_items=len(items),
-            processing_time_ms=processing_time,
+            items=result["items"],
+            disposal_instructions=result["disposal_instructions"],
+            total_items=len(result["items"]),
+            processing_time_ms=processing_time_ms,
         )
 
     except ValueError as e:
-        # Config errors (missing API key) or JSON parse failures
+        # Config errors (missing API key), JSON parse failures, or input errors
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Classification failed: {e}")

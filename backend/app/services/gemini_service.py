@@ -10,8 +10,7 @@ Uses the new `google-genai` SDK (replaces the deprecated `google-generativeai`).
 
 import base64
 import json
-import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from google import genai
 from google.genai import types
@@ -45,7 +44,7 @@ Return ONLY a JSON array (no markdown fences, no explanation) where each element
   "confidence_score": 0.0-1.0
 }
 
-If multiple items are visible, return one object per item.\
+If multiple items are identified, return one object per item.\
 """
 
 DISPOSAL_PROMPT = """\
@@ -68,8 +67,6 @@ Mention any special handling for hazardous or soiled items.\
 
 
 # ── Service ──────────────────────────────────────────────────────────────────
-
-
 def _parse_json_response(text: str) -> List[Dict]:
     """
     Parse JSON from Gemini's response, stripping markdown code fences if present.
@@ -148,6 +145,36 @@ class GeminiClassificationService:
         items_data = _parse_json_response(response.text)
         return [WasteClassificationItem(**item) for item in items_data]
 
+    async def classify_text(
+        self,
+        message: str,
+        user_location: Optional[str] = None,
+    ) -> List[WasteClassificationItem]:
+        """
+        Step 1: Send the user's text input to Gemini and get structured waste classification data.
+
+        Args:
+            message: The user's input prompt.
+            user_location: Optional location string to help with localized rules.
+
+        Returns:
+            A list of WasteClassificationItem objects (one per detected item).
+        """
+        prompt = CLASSIFICATION_PROMPT
+
+        if user_location:
+            prompt += f"\n\nThe user's location is: {user_location}"
+        
+        prompt += f"\n\nThe user's prompt is as follows: {message}"
+
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
+            contents=prompt,
+        )
+
+        items_data = _parse_json_response(response.text)
+        return [WasteClassificationItem(**item) for item in items_data]
+
     async def get_disposal_instructions(
         self,
         items: List[WasteClassificationItem],
@@ -173,22 +200,4 @@ class GeminiClassificationService:
 
         instructions_data = _parse_json_response(response.text)
         return [DisposalInstruction(**inst) for inst in instructions_data]
-
-    async def classify_and_advise(
-        self,
-        image_base64: str,
-        user_location: Optional[str] = None,
-    ) -> Tuple[List[WasteClassificationItem], List[DisposalInstruction], float]:
-        """
-        Full pipeline: classify image → generate disposal instructions.
-
-        Returns:
-            (items, disposal_instructions, processing_time_ms)
-        """
-        start = time.time()
-
-        items = await self.classify_image(image_base64, user_location)
-        instructions = await self.get_disposal_instructions(items)
-
-        elapsed_ms = (time.time() - start) * 1000
-        return items, instructions, elapsed_ms
+    
