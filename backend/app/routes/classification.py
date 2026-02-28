@@ -4,7 +4,7 @@ Waste classification API routes.
 POST /api/v1/classify  — accepts a base64 image or text, invokes agenti loop, returns classification + disposal instructions
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 import time
 
 from app.core.auth import verify_google_token
@@ -13,18 +13,20 @@ from app.schemas.classification import (
     ClassificationResponse,
 )
 from app.services.agent import agent
+from app.services.location_service import get_location_from_ip
 
 # Create a router with a URL prefix and a tag (shows up in auto-generated docs)
 router = APIRouter(prefix="/api/v1", tags=["classification"])
 
 
 @router.post("/classify", response_model=ClassificationResponse)
-async def classify_waste_image(
+async def classify_waste_input(
     request: ClassificationRequest,
+    raw_request: Request,
     user: dict = Depends(verify_google_token),
 ):
     """
-    Classify waste items in a photo and get disposal instructions.
+    Classify waste items in a photo or text and get disposal instructions.
 
     Flow:
     1. FastAPI validates the request body against ClassificationRequest
@@ -38,10 +40,20 @@ async def classify_waste_image(
     start_time = time.time()
 
     try:
+        # First, get IP address of user for location
+        location = request.location
+        if not location:
+            client_ip = (
+                raw_request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or
+                raw_request.client.host
+            )
+            location = await get_location_from_ip(client_ip)
+
+        # Invoke agentic loop 
         result = await agent.ainvoke({
             "image_base64": request.image_base64,
             "message": request.message,
-            "location": request.location,
+            "location": location,
         })
 
         processing_time_ms = (time.time() - start_time) * 1000

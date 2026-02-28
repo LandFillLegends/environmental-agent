@@ -7,13 +7,13 @@ python-dotenv==1.0.0
 # LangGraph and LangChain - Let pip resolve compatible versions
 langgraph
 langchain
-langchain-openai
+langchain-google-genai
+langchain-tavily
 
 # Additional utilities
 httpx>=0.26.0
 
-# Gemini AI and image processing
-google-genai
+# Image processing
 python-multipart
 Pillow
 

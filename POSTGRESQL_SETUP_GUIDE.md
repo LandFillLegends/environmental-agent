@@ -358,7 +358,7 @@ def health_check():
 # Start the server
 cd backend
 source venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+uvicorn main:app --reload --port 8000
 ```
 
 **Visit:**

@@ -4,19 +4,15 @@ Gemini-powered waste classification service.
 Two-step pipeline:
 1. classify_image()  — sends photo to Gemini, gets structured item data (JSON)
 2. get_disposal_instructions() — sends that data back to Gemini, gets human-readable disposal advice
-
-Uses the new `google-genai` SDK (replaces the deprecated `google-generativeai`).
 """
-
-import base64
 import json
 from typing import Dict, List, Optional
 
-from google import genai
-from google.genai import types
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 
 from app.core.config import settings
-from app.schemas.classification import DisposalInstruction, WasteClassificationItem
+from app.schemas.classification import WasteClassificationItem
 
 # ── Prompts ──────────────────────────────────────────────────────────────────
 
@@ -47,27 +43,9 @@ Return ONLY a JSON array (no markdown fences, no explanation) where each element
 If multiple items are identified, return one object per item.\
 """
 
-DISPOSAL_PROMPT = """\
-You are a Waste Disposal Advisor. Given the following classified waste items, \
-provide clear, concise disposal instructions for each one.
-
-Items to advise on:
-{items_json}
-
-For each item, return a JSON array (no markdown fences, no explanation) where each element is:
-{{
-  "item_name": "string (must match the input)",
-  "material_type": "string (must match the input)",
-  "instruction": "string - 1-3 sentences of practical disposal advice"
-}}
-
-Be specific about whether to recycle, compost, or landfill. \
-Mention any special handling for hazardous or soiled items.\
-"""
-
 
 # ── Service ──────────────────────────────────────────────────────────────────
-def _parse_json_response(text: str) -> List[Dict]:
+def parse_json_response(text: str) -> List[Dict]:
     """
     Parse JSON from Gemini's response, stripping markdown code fences if present.
 
@@ -93,9 +71,12 @@ class GeminiClassificationService:
             raise ValueError(
                 "GEMINI_API_KEY is not set. Add it to your .env file."
             )
-        # New SDK: create a Client instead of calling configure()
-        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        self.model = "gemini-2.5-flash"
+    
+        # Switch to Langchain Google SDK
+        self.model = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=settings.GEMINI_API_KEY
+        )
 
     async def classify_image(
         self,
@@ -124,25 +105,22 @@ class GeminiClassificationService:
         if missing_padding:
             image_base64 += "=" * (4 - missing_padding)
 
-        image_bytes = base64.b64decode(image_base64)
-
         # Build the prompt (add location context if provided)
         prompt = CLASSIFICATION_PROMPT
         if user_location:
             prompt += f"\n\nThe user's location is: {user_location}"
 
-        # New SDK: pass content parts as a list to generate_content
-        # types.Part.from_bytes() creates an image part from raw bytes
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=[
-                prompt,
-                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-            ],
-        )
+        # LangChain message format for multimodal input
+        message = HumanMessage(content=[
+            {"type": "text", "text": prompt},
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
+            },
+        ])
 
-        # Parse the JSON response into our Pydantic models
-        items_data = _parse_json_response(response.text)
+        response = await self.model.ainvoke([message])
+        items_data = parse_json_response(response.content)
         return [WasteClassificationItem(**item) for item in items_data]
 
     async def classify_text(
@@ -167,37 +145,9 @@ class GeminiClassificationService:
         
         prompt += f"\n\nThe user's prompt is as follows: {message}"
 
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=prompt,
-        )
+        messages = [HumanMessage(content=prompt)]
+        response = await self.model.ainvoke(messages)
 
-        items_data = _parse_json_response(response.text)
+        items_data = parse_json_response(response.content)
         return [WasteClassificationItem(**item) for item in items_data]
-
-    async def get_disposal_instructions(
-        self,
-        items: List[WasteClassificationItem],
-    ) -> List[DisposalInstruction]:
-        """
-        Step 2: Take classification results and ask Gemini for disposal advice.
-
-        This is a text-only call (no image needed) — we just pass the structured
-        data from step 1 and ask for human-readable instructions.
-        """
-        # Convert items to JSON for the prompt
-        items_json = json.dumps(
-            [item.model_dump() for item in items],
-            indent=2,
-        )
-
-        prompt = DISPOSAL_PROMPT.format(items_json=items_json)
-
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=prompt,
-        )
-
-        instructions_data = _parse_json_response(response.text)
-        return [DisposalInstruction(**inst) for inst in instructions_data]
     
