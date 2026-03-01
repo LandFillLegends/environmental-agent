@@ -1,6 +1,14 @@
 import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
+  
+  greeting: {
+  fontSize: 16,
+  opacity: 0.7,
+  marginBottom: 4,
+  
+},
+  
   container: {
     flex: 1,
   },

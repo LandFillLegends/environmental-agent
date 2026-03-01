@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { useColorScheme } from 'react-native'
+import { useColorScheme, Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { Session } from '@supabase/supabase-js'
 import 'react-native-reanimated'
@@ -32,6 +32,13 @@ export default function RootLayout() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Clean up the # from URL after OAuth redirect on web
+  useEffect(() => {
+    if (initialized && Platform.OS === 'web') {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [initialized])
+
   useEffect(() => {
     if (!initialized) return
 
@@ -59,3 +66,11 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   )
 }
+
+ /* useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setInitialized(true)
+    })
+  */
