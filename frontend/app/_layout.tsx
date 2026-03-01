@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
-import { Slot, useRouter, useSegments } from 'expo-router'
-import { Stack } from 'expo-router'
+import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { useColorScheme } from 'react-native'
@@ -29,6 +28,7 @@ export default function RootLayout() {
         setSession(session)
       }
     )
+
     return () => subscription.unsubscribe()
   }, [])
 
