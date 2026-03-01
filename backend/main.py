@@ -2,20 +2,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.graph import MessageGraph
 from app.routes import user
+from app.routes.classification import router as classification_router
 from app.database import engine, Base
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
 # Create the FastAPI app
-app = FastAPI(title="Environmental Agent API")
+app = FastAPI(title="Environmental Agent API", version="1.0.0")
 
-# CORS - allows frontend to talk to backend
+# CORS — allows frontend to talk to backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:8081",           # Expo local
-        "https://environmental-agent-seven.vercel.app",     # Vercel production - replace with your URL
+        "http://localhost:8081",                              # Expo local
+        "https://environmental-agent-seven.vercel.app",      # Vercel production
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -24,6 +25,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(user.router, prefix="/api/v1")
+app.include_router(classification_router)
 
 # LangGraph "Brain"
 builder = MessageGraph()

@@ -7,12 +7,10 @@ WebBrowser.maybeCompleteAuthSession()
 
 const getRedirectUrl = () => {
   if (Platform.OS === 'web') {
-    // Use Vercel URL in production, localhost in development
     return __DEV__
       ? 'http://localhost:8081'
-      : 'https://your-app.vercel.app'  // 🔁 replace with your actual Vercel URL
+      : 'https://environmental-agent-seven.vercel.app'
   }
-  // Mobile: use Expo's redirect URI
   return makeRedirectUri()
 }
 
