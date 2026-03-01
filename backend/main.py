@@ -1,33 +1,52 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from langgraph.graph import MessageGraph
-from typing import List
+from app.routes import user
+from app.routes.classification import router as classification_router
+from app.database import engine, Base
 
-# 1. Create the FastAPI app
-app = FastAPI()
+# Create database tables
+Base.metadata.create_all(bind=engine)
 
-# 2. Define the LangGraph "Brain"
-# This is a simple graph that just takes a message and adds a response
+# Create the FastAPI app
+app = FastAPI(title="Environmental Agent API", version="1.0.0")
+
+# CORS — allows frontend to talk to backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8081",                              # Expo local
+        "https://environmental-agent-seven.vercel.app",      # Vercel production
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(user.router, prefix="/api/v1")
+app.include_router(classification_router)
+
+# LangGraph "Brain"
 builder = MessageGraph()
 builder.add_node("oracle", lambda state: "Hello! Your backend is officially alive.")
 builder.set_entry_point("oracle")
 builder.set_finish_point("oracle")
-
-# Compile the graph so it's ready to run
 agent = builder.compile()
 
-# 3. Create the API Endpoint
+# API Endpoints
 @app.get("/chat")
 async def chat_with_agent():
-    # We invoke the graph with a starting message
     result = await agent.ainvoke("Hi")
-    
-    # LangGraph returns the full list of messages, 
-    # so we grab the last one to send to the frontend
     return {"reply": result[-1]}
 
 @app.get("/")
 def home():
     return {"status": "Server is running"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn
