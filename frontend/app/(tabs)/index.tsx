@@ -23,13 +23,40 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import type { ClassificationResponse } from '@/types/classification';
+import { supabase } from '@/lib/supabase';
 
 export default function HomeScreen() {
   const params = useLocalSearchParams<{ classificationResult?: string }>();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [results, setResults] = useState<ClassificationResponse | null>(null);
   const [message, setMessage] = useState('');
+  const [username, setUsername] = useState<string | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
   const textColor = useThemeColor({}, 'text');
+
+  // Fetch username from Supabase
+  useEffect(() => {
+    const fetchUsername = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setLoadingUser(false)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('username')
+        .eq('id', user.id)
+        .single()
+
+      if (!error && data?.username) {
+        setUsername(data.username)
+      }
+      setLoadingUser(false)
+    }
+
+    fetchUsername()
+  }, [])
 
   // When we navigate back from the camera with results, parse and show them
   useEffect(() => {
@@ -70,6 +97,9 @@ export default function HomeScreen() {
       <View style={styles.content}>
         {/* Branding */}
         <View style={styles.header}>
+          {!loadingUser && username && (
+            <ThemedText style={styles.greeting}>Welcome, {username}</ThemedText>
+          )}
           <ThemedText type="title">Landfill Legends</ThemedText>
           <ThemedText style={styles.tagline}>AI-powered waste classification</ThemedText>
         </View>
