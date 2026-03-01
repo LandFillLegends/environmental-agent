@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    BYPASS_AUTH: bool = False
+
     # OpenAI
     OPENAI_API_KEY: Optional[str] = None
 
