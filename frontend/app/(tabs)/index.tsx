@@ -21,6 +21,7 @@ import { ClassificationResultsSheet } from '@/components/classification-results-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import type { ClassificationResponse } from '@/types/classification';
 
@@ -30,6 +31,7 @@ export default function HomeScreen() {
   const [results, setResults] = useState<ClassificationResponse | null>(null);
   const [message, setMessage] = useState('');
   const textColor = useThemeColor({}, 'text');
+  const { location: deviceLocation } = useDeviceLocation();
 
   // When we navigate back from the camera with results, parse and show them
   useEffect(() => {
@@ -49,17 +51,23 @@ export default function HomeScreen() {
 
   const handleScanPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/camera');
-  }, []);
+    router.push({
+      pathname: '/camera',
+      params: deviceLocation?.locationString ? { location: deviceLocation.locationString } : {},
+    });
+  }, [deviceLocation]);
 
   const handleTextSubmit = useCallback(() => {
     if (!message.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
       pathname: '/loading',
-      params: { message: message.trim() },
+      params: {
+        message: message.trim(),
+        ...(deviceLocation?.locationString ? { location: deviceLocation.locationString } : {}),
+      },
     });
-  }, [message]);
+  }, [message, deviceLocation]);
 
   const handleSheetClose = useCallback(() => {
     setResults(null);

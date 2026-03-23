@@ -3,8 +3,9 @@
 import json
 
 from typing import TypedDict, Optional, List, Annotated
-from app.schemas.classification import WasteClassificationItem, DisposalInstruction
+from app.schemas.classification import WasteClassificationItem, DisposalInstruction, DisposalFacility
 from app.services.gemini_service import parse_json_response, GeminiClassificationService
+from app.services.places_service import enrich_facilities
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import BaseMessage, HumanMessage
@@ -67,11 +68,19 @@ Your job:
 2. If your first search is too generic, search again with a more specific query.
    e.g. "{location} recycling program" or "{location} hazardous waste drop-off"
 3. Only stop searching when you have specific local policy information.
-4. Return ONLY a JSON array (no markdown fences) where each element is:
+4. Also search for 1-3 nearby disposal/recycling facilities where the user can
+   bring each item. Include the facility's full name and complete street address.
+5. Return ONLY a JSON array (no markdown fences) where each element is:
 {{
   "item_name": "string (must match input)",
-  "material_type": "string (must match input)",  
-  "instruction": "1-3 sentences with SPECIFIC local disposal instructions"
+  "material_type": "string (must match input)",
+  "instruction": "1-3 sentences with SPECIFIC local disposal instructions",
+  "facilities": [
+    {{
+      "name": "Facility Name",
+      "address": "123 Main St, City, State ZIP"
+    }}
+  ]
 }}
 
 Waste items to research:
@@ -151,7 +160,14 @@ async def disposal_agent_node(state: OverallState) -> dict:
     if not response.tool_calls:
         try:
             instructions_data = parse_json_response(response.content)
-            instructions = [DisposalInstruction(**inst) for inst in instructions_data]
+            location = state.get("location")
+
+            instructions = []
+            for inst in instructions_data:
+                raw_facilities = inst.pop("facilities", [])
+                enriched = await enrich_facilities(raw_facilities, user_location=location)
+                instructions.append(DisposalInstruction(**inst, facilities=enriched))
+
             return {"messages": new_messages, "disposal_instructions": instructions}
         except Exception as e:
             raise ValueError(f"Failed to parse disposal instructions: {e}")
