@@ -1,6 +1,7 @@
 
 import ipaddress
 import httpx
+from typing import Optional
 
 DEV_FALLBACK_LOCATION = "Marietta, GA 30062, US"
 
@@ -10,7 +11,7 @@ def is_private_ip(ip: str) -> bool:
     except ValueError:
         return False
 
-async def get_location_from_ip(ip: str) -> str | None:
+async def get_location_from_ip(ip: str) -> Optional[str]:
     if is_private_ip(ip):
         return DEV_FALLBACK_LOCATION
     

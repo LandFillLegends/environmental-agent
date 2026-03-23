@@ -130,28 +130,34 @@ async def disposal_agent_node(state: OverallState) -> dict:
             }
             for item in items
         ], indent=2)
-    
+
         filled_prompt = DISPOSAL_PROMPT.format(
             location=location,
             items_json=items_json
         )
-        messages = [HumanMessage(content=filled_prompt)]
+        initial_message = HumanMessage(content=filled_prompt)
+        messages = [initial_message]
     else:
+        initial_message = None
         messages = state["messages"]
-    
+
     response = await model_with_tools.ainvoke(messages)
+
+    # Include the initial HumanMessage in returned messages so the full
+    # conversation history is preserved in state for subsequent loop iterations.
+    new_messages = [initial_message, response] if initial_message else [response]
 
     # Gemini is done searching — parse final JSON response
     if not response.tool_calls:
         try:
             instructions_data = parse_json_response(response.content)
             instructions = [DisposalInstruction(**inst) for inst in instructions_data]
-            return {"messages": [response], "disposal_instructions": instructions}
+            return {"messages": new_messages, "disposal_instructions": instructions}
         except Exception as e:
             raise ValueError(f"Failed to parse disposal instructions: {e}")
 
     # Gemini wants to search — return tool call message, ToolNode handles the rest
-    return {"messages": [response]}
+    return {"messages": new_messages}
 
 
 ## Create StateGraph
