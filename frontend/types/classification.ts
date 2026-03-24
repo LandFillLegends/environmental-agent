@@ -14,10 +14,22 @@ export interface WasteClassificationItem {
   confidence_score: number;
 }
 
+export interface DisposalFacility {
+  name: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  place_id: string | null;
+  phone: string | null;
+  rating: number | null;
+  website: string | null;
+}
+
 export interface DisposalInstruction {
   item_name: string;
   material_type: string;
   instruction: string;
+  facilities: DisposalFacility[];
 }
 
 export interface ClassificationRequest {

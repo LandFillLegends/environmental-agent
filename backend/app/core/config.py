@@ -14,7 +14,9 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    BYPASS_AUTH: bool = False
+    # Auth
+    BYPASS_AUTH: bool = False  # Set to True locally for testing without OAuth
+    SUPABASE_JWT_SECRET: str
 
     # OpenAI
     OPENAI_API_KEY: Optional[str] = None
@@ -22,17 +24,19 @@ class Settings(BaseSettings):
     # Gemini
     GEMINI_API_KEY: Optional[str] = None
 
+    # Tavily - Web Search
+    TAVILY_API_KEY: Optional[str] = None
+
+    # Google Places API
+    GOOGLE_PLACES_API_KEY: Optional[str] = None
+
     # Google OAuth
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
     GOOGLE_OAUTH_CLIENT_SECRET: Optional[str] = None
     GOOGLE_OAUTH_REDIRECT_URI: Optional[str] = None
 
-    BYPASS_AUTH: bool = True  # Set to False in production once OAuth is ready
-
     # Environment
     ENVIRONMENT: str = "development"
-
-    SUPABASE_JWT_SECRET: str
 
     class Config:
         env_file = ".env"

@@ -21,6 +21,7 @@ import { ClassificationResultsSheet } from '@/components/classification-results-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import type { ClassificationResponse } from '@/types/classification';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +34,7 @@ export default function HomeScreen() {
   const [username, setUsername] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const textColor = useThemeColor({}, 'text');
+  const { location: deviceLocation } = useDeviceLocation();
 
   // Fetch username from Supabase
   useEffect(() => {
@@ -79,17 +81,23 @@ export default function HomeScreen() {
 
   const handleScanPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/camera');
-  }, []);
+    router.push({
+      pathname: '/camera',
+      params: deviceLocation?.locationString ? { location: deviceLocation.locationString } : {},
+    });
+  }, [deviceLocation]);
 
   const handleTextSubmit = useCallback(() => {
     if (!message.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
       pathname: '/loading',
-      params: { message: message.trim() },
+      params: {
+        message: message.trim(),
+        ...(deviceLocation?.locationString ? { location: deviceLocation.locationString } : {}),
+      },
     });
-  }, [message]);
+  }, [message, deviceLocation]);
 
   const handleSheetClose = useCallback(() => {
     setResults(null);

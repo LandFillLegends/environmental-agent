@@ -368,6 +368,7 @@ def health_check():
 
 ```bash
 cd backend
+source venv/bin/activate
 venv\Scripts\activate  # Windows
 uvicorn app.main:app --reload --port 8000
 ```

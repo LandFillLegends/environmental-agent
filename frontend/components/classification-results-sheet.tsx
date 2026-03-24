@@ -6,9 +6,10 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import type { BottomSheetDefaultBackdropProps } from '@gorhom/bottom-sheet/lib/typescript/components/bottomSheetBackdrop/types';
+import { router } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -119,6 +120,31 @@ export function ClassificationResultsSheet({
                 </View>
               )}
 
+              {/* Nearby facilities button */}
+              {disposalInstructions.find((d) => d.item_name === item.item_name)?.facilities
+                ?.length ? (
+                <TouchableOpacity
+                  style={styles.facilitiesButton}
+                  onPress={() => {
+                    const facilities = disposalInstructions.find(
+                      (d) => d.item_name === item.item_name,
+                    )!.facilities;
+                    router.push({
+                      pathname: '/facility-map',
+                      params: {
+                        facilities: JSON.stringify(facilities),
+                        itemName: item.item_name,
+                        materialType: item.material_type,
+                      },
+                    });
+                  }}
+                >
+                  <ThemedText style={styles.facilitiesButtonText}>
+                    View Nearby Facilities
+                  </ThemedText>
+                </TouchableOpacity>
+              ) : null}
+
               {/* Location if detected */}
               {item.location && (
                 <ThemedText style={styles.location}>Location: {item.location}</ThemedText>
@@ -214,6 +240,19 @@ const styles = StyleSheet.create({
   instructionText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  facilitiesButton: {
+    marginTop: 10,
+    backgroundColor: '#0a7ea4',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  facilitiesButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   location: {
     marginTop: 8,

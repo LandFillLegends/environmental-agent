@@ -10,15 +10,17 @@
  * 3. Navigate to the shared loading screen with the image
  */
 
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { WasteCamera } from '@/components/waste-camera';
 
 export default function CameraScreen() {
+  const { location } = useLocalSearchParams<{ location?: string }>();
+
   const handleCapture = (base64Image: string) => {
     router.replace({
       pathname: '/loading',
-      params: { image_base64: base64Image },
+      params: { image_base64: base64Image, ...(location ? { location } : {}) },
     });
   };
 
