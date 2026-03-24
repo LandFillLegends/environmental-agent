@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     # Gemini
     GEMINI_API_KEY: Optional[str] = None
 
+    # Tavily - Web Search
+    TAVILY_API_KEY: Optional[str] = None
+
+    # Google Places API
+    GOOGLE_PLACES_API_KEY: Optional[str] = None
+
     # Google OAuth (your friend is building this on another branch)
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
     BYPASS_AUTH: bool = True  # Set to False in production once OAuth is ready

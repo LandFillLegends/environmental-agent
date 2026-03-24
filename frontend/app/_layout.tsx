@@ -60,6 +60,7 @@ export default function RootLayout() {
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           <Stack.Screen name="camera" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           <Stack.Screen name="loading" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+          <Stack.Screen name="facility-map" options={{ presentation: 'fullScreenModal', headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

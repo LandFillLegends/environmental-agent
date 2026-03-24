@@ -13,11 +13,24 @@ class WasteClassificationItem(BaseModel):
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Model confidence from 0.0 to 1.0")
 
 
+class DisposalFacility(BaseModel):
+    """A nearby disposal/recycling facility with optional geocoded details."""
+    name: str
+    address: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    place_id: Optional[str] = None
+    phone: Optional[str] = None
+    rating: Optional[float] = None
+    website: Optional[str] = None
+
+
 class DisposalInstruction(BaseModel):
     """Human-readable disposal instruction for one item."""
     item_name: str
     material_type: str
     instruction: str = Field(..., description="Plain-language disposal/recycling instructions")
+    facilities: List[DisposalFacility] = Field(default_factory=list, description="Nearby disposal facilities")
 
 
 class ClassificationRequest(BaseModel):
