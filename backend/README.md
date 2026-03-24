@@ -25,6 +25,8 @@ backend/
    ```bash
    cd backend
    source venv/bin/activate
+
+   venv\Scripts\activate - for windows
    ```
 
 2. **Install dependencies (if not already installed):**

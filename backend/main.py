@@ -4,6 +4,7 @@ from langgraph.graph import MessageGraph
 from app.routes import user
 from app.routes.classification import router as classification_router
 from app.database import engine, Base
+from app.routes.calendar import router as calendar_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -26,6 +27,7 @@ app.add_middleware(
 # Include routers
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(classification_router)
+app.include_router(calendar_router)
 
 # LangGraph "Brain"
 builder = MessageGraph()

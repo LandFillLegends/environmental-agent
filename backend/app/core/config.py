@@ -22,8 +22,11 @@ class Settings(BaseSettings):
     # Gemini
     GEMINI_API_KEY: Optional[str] = None
 
-    # Google OAuth (your friend is building this on another branch)
+    # Google OAuth
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
+    GOOGLE_OAUTH_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_OAUTH_REDIRECT_URI: Optional[str] = None
+
     BYPASS_AUTH: bool = True  # Set to False in production once OAuth is ready
 
     # Environment

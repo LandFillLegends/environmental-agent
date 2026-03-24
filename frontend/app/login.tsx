@@ -25,6 +25,7 @@ export default function LoginScreen() {
         skipBrowserRedirect: Platform.OS !== 'web',
       },
     })
+    
 
     if (error) console.error(error)
     if (!data?.url) return
