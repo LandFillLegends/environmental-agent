@@ -7,7 +7,7 @@ POST /api/v1/classify  — accepts a base64 image or text, invokes agenti loop, 
 from fastapi import APIRouter, Depends, HTTPException, Request
 import time
 
-from app.core.auth import verify_google_token
+from app.core.auth import get_current_user
 from app.schemas.classification import (
     ClassificationRequest,
     ClassificationResponse,
@@ -22,15 +22,16 @@ router = APIRouter(prefix="/api/v1", tags=["classification"])
 @router.post("/classify", response_model=ClassificationResponse)
 async def classify_waste_input(
     request: ClassificationRequest,
-    raw_request: Request,
-    user: dict = Depends(verify_google_token),
+#    raw_request: Request,
+#    user: dict = Depends(verify_google_token),
+    user: dict = Depends(get_current_user),
 ):
     """
     Classify waste items in a photo or text and get disposal instructions.
 
     Flow:
     1. FastAPI validates the request body against ClassificationRequest
-    2. verify_google_token checks auth (bypassed in dev)
+    2. get_current_user checks auth (bypassed in dev)
     3. We call Gemini twice: classify → disposal advice
     4. FastAPI validates the response against ClassificationResponse and returns JSON
 
