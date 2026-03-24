@@ -8,6 +8,31 @@ import { supabase } from '../lib/supabase'
 import { Session } from '@supabase/supabase-js'
 import 'react-native-reanimated'
 
+const API_BASE_URL = __DEV__
+  ? 'http://localhost:8000'
+  : process.env.EXPO_PUBLIC_API_URL
+
+// Store Google OAuth tokens in the backend after login
+async function storeGoogleTokens(session: Session) {
+  if (!session.provider_token) return  // no Google token, skip
+
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/users/store-tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        google_access_token: session.provider_token,
+        google_refresh_token: session.provider_refresh_token ?? null,
+      }),
+    })
+  } catch (e) {
+    console.error('Failed to store Google tokens:', e)
+  }
+}
+
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
   const [initialized, setInitialized] = useState(false)
@@ -24,8 +49,13 @@ export default function RootLayout() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session)
+
+        // Store Google tokens when user signs in
+        if (_event === 'SIGNED_IN' && session) {
+          await storeGoogleTokens(session)
+        }
       }
     )
 
@@ -67,11 +97,3 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   )
 }
-
- /* useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setInitialized(true)
-    })
-  */

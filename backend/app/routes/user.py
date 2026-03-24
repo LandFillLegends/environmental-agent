@@ -2,12 +2,19 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 from app.database import get_db
 from app.schemas.user import UserCreate, UserResponse
 from app.models.user import User
 from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+class TokenStore(BaseModel):
+    google_access_token: str
+    google_refresh_token: Optional[str] = None
 
 
 @router.get("/me", response_model=UserResponse)
@@ -44,3 +51,18 @@ def update_me(
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+@router.post("/store-tokens")
+def store_tokens(
+    tokens: TokenStore,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_user = db.query(User).filter(User.id == user["sub"]).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db_user.google_access_token = tokens.google_access_token
+    db_user.google_refresh_token = tokens.google_refresh_token
+    db.commit()
+    return {"status": "tokens stored"}

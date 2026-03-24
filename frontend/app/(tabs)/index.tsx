@@ -45,6 +45,9 @@ export default function HomeScreen() {
         return
       }
 
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log('Provider token:', session?.provider_token)
+
       const { data, error } = await supabase
         .from('users')
         .select('username')
