@@ -159,7 +159,15 @@ async def disposal_agent_node(state: OverallState) -> dict:
     # Gemini is done searching — parse final JSON response
     if not response.tool_calls:
         try:
-            instructions_data = parse_json_response(response.content)
+            # Handle case where response.content is a list of content blocks
+            content = response.content
+            if isinstance(content, list):
+                content = " ".join(
+                    block.get("text", "") if isinstance(block, dict) else str(block)
+                    for block in content
+                )
+
+            instructions_data = parse_json_response(content)
             location = state.get("location")
 
             instructions = []
