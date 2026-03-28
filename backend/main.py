@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.graph import MessageGraph
@@ -6,8 +8,21 @@ from app.routes.classification import router as classification_router
 from app.database import engine, Base
 from app.routes.calendar import router as calendar_router
 
+# Configure logging for the entire backend
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+# Quieten noisy third-party loggers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
+logger.info("Database tables ensured")
 
 # Create the FastAPI app
 app = FastAPI(title="Environmental Agent API", version="1.0.0")

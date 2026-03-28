@@ -25,11 +25,14 @@ async def enrich_facility(
     with just the name and address from Gemini.
     """
     if not settings.GOOGLE_PLACES_API_KEY:
+        logger.warning("GOOGLE_PLACES_API_KEY not set — skipping Places enrichment for %r", name)
         return DisposalFacility(name=name, address=address)
 
     query = f"{name} {address}"
     if user_location:
         query += f" near {user_location}"
+
+    logger.info("Places API lookup — query=%r user_location=%r", query, user_location)
 
     headers = {
         "Content-Type": "application/json",
@@ -50,23 +53,28 @@ async def enrich_facility(
         data = resp.json()
         places = data.get("places", [])
         if not places:
+            logger.warning("Places API returned no results for query=%r", query)
             return DisposalFacility(name=name, address=address)
 
         place = places[0]
-        location = place.get("location", {})
-
-        return DisposalFacility(
+        loc = place.get("location", {})
+        enriched = DisposalFacility(
             name=place.get("displayName", {}).get("text", name),
             address=place.get("formattedAddress", address),
-            latitude=location.get("latitude"),
-            longitude=location.get("longitude"),
+            latitude=loc.get("latitude"),
+            longitude=loc.get("longitude"),
             place_id=place.get("id"),
             phone=place.get("nationalPhoneNumber"),
             rating=place.get("rating"),
             website=place.get("websiteUri"),
         )
+        logger.info(
+            "Places API enriched %r → name=%r address=%r lat=%s lng=%s",
+            name, enriched.name, enriched.address, enriched.latitude, enriched.longitude,
+        )
+        return enriched
     except Exception as e:
-        logger.warning("Places API lookup failed for '%s': %s", name, e)
+        logger.warning("Places API lookup failed for %r (query=%r): %s", name, query, e, exc_info=True)
         return DisposalFacility(name=name, address=address)
 
 

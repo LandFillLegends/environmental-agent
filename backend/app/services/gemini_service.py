@@ -6,6 +6,7 @@ Two-step pipeline:
 2. get_disposal_instructions() — sends that data back to Gemini, gets human-readable disposal advice
 """
 import json
+import logging
 from typing import Dict, List, Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -13,6 +14,8 @@ from langchain_core.messages import HumanMessage
 
 from app.core.config import settings
 from app.schemas.classification import WasteClassificationItem
+
+logger = logging.getLogger(__name__)
 
 # ── Prompts ──────────────────────────────────────────────────────────────────
 
@@ -55,12 +58,20 @@ def parse_json_response(text: str) -> List[Dict]:
     cleaned = text.strip()
 
     # Strip markdown code fences
-    if cleaned.startswith("```"):
+    had_fences = cleaned.startswith("```")
+    if had_fences:
         # Remove first line (```json or ```) and last line (```)
         lines = cleaned.split("\n")
         cleaned = "\n".join(lines[1:-1]).strip()
+        logger.debug("Stripped markdown fences from Gemini response")
 
-    return json.loads(cleaned)
+    try:
+        result = json.loads(cleaned)
+        logger.debug("Parsed %d item(s) from Gemini JSON response", len(result) if isinstance(result, list) else 1)
+        return result
+    except json.JSONDecodeError as e:
+        logger.error("JSON parse error — had_fences=%s raw_text=%r error=%s", had_fences, text[:500], e)
+        raise
 
 
 class GeminiClassificationService:
@@ -93,22 +104,29 @@ class GeminiClassificationService:
         Returns:
             A list of WasteClassificationItem objects (one per detected item).
         """
+        logger.info("classify_image called — user_location=%r image_size_chars=%d", user_location, len(image_base64))
+
         # Strip data URI prefix if present.
         # Cameras/browsers sometimes send "data:image/jpeg;base64,/9j/4AAQ..."
         # We only want the part after the comma.
         if "," in image_base64[:100]:
             image_base64 = image_base64.split(",", 1)[1]
+            logger.debug("Stripped data URI prefix from image_base64")
 
         # Fix padding — base64 strings must be a multiple of 4 chars.
         # If truncated, adding "=" padding fixes it.
         missing_padding = len(image_base64) % 4
         if missing_padding:
             image_base64 += "=" * (4 - missing_padding)
+            logger.debug("Added %d padding chars to image_base64", 4 - missing_padding)
 
         # Build the prompt (add location context if provided)
         prompt = CLASSIFICATION_PROMPT
         if user_location:
             prompt += f"\n\nThe user's location is: {user_location}"
+            logger.debug("Appended location to classification prompt: %r", user_location)
+        else:
+            logger.warning("classify_image: no user_location provided — location-specific classification may be imprecise")
 
         # LangChain message format for multimodal input
         message = HumanMessage(content=[
@@ -119,9 +137,18 @@ class GeminiClassificationService:
             },
         ])
 
+        logger.debug("Sending image classification request to Gemini")
         response = await self.model.ainvoke([message])
+        logger.debug("Gemini image classification raw response: %r", response.content[:500] if response.content else None)
+
         items_data = parse_json_response(response.content)
-        return [WasteClassificationItem(**item) for item in items_data]
+        items = [WasteClassificationItem(**item) for item in items_data]
+        logger.info(
+            "classify_image complete — %d item(s) found: %s",
+            len(items),
+            [{"item": i.item_name, "material": i.material_type, "search_query": i.search_query} for i in items],
+        )
+        return items
 
     async def classify_text(
         self,
@@ -138,16 +165,29 @@ class GeminiClassificationService:
         Returns:
             A list of WasteClassificationItem objects (one per detected item).
         """
+        logger.info("classify_text called — user_location=%r message=%r", user_location, message[:200])
+
         prompt = CLASSIFICATION_PROMPT
 
         if user_location:
             prompt += f"\n\nThe user's location is: {user_location}"
-        
+            logger.debug("Appended location to classification prompt: %r", user_location)
+        else:
+            logger.warning("classify_text: no user_location provided — location-specific classification may be imprecise")
+
         prompt += f"\n\nThe user's prompt is as follows: {message}"
 
         messages = [HumanMessage(content=prompt)]
+        logger.debug("Sending text classification request to Gemini")
         response = await self.model.ainvoke(messages)
+        logger.debug("Gemini text classification raw response: %r", response.content[:500] if response.content else None)
 
         items_data = parse_json_response(response.content)
-        return [WasteClassificationItem(**item) for item in items_data]
+        items = [WasteClassificationItem(**item) for item in items_data]
+        logger.info(
+            "classify_text complete — %d item(s) found: %s",
+            len(items),
+            [{"item": i.item_name, "material": i.material_type, "search_query": i.search_query} for i in items],
+        )
+        return items
     
