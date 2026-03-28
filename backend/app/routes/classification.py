@@ -1,7 +1,7 @@
 """
 Waste classification API routes.
 
-POST /api/v1/classify  — accepts a base64 image or text, invokes agenti loop, returns classification + disposal instructions
+POST /api/v1/classify  — accepts a base64 image or text, invokes agentic loop, returns classification + disposal instructions
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1", tags=["classification"])
 @router.post("/classify", response_model=ClassificationResponse)
 async def classify_waste_input(
     request: ClassificationRequest,
-#    raw_request: Request,
+    raw_request: Request,
 #    user: dict = Depends(verify_google_token),
     user: dict = Depends(get_current_user),
 ):
