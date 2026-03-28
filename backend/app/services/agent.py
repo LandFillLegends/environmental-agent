@@ -83,6 +83,16 @@ Your job:
   ]
 }}
 
+If you do not detect any waste items, return a JSON array with one object using these fields:
+{{
+  "item_name": "unknown",
+  "material_type": "unknown",
+  "instruction": "No specific items detected. Please provide more details or try again.",
+  "facilities": []
+}}
+
+Never return plain text or explanations—always return a JSON array as specified above.
+
 Waste items to research:
 {items_json}
 """

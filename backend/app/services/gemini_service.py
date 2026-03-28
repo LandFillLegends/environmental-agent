@@ -29,8 +29,6 @@ Input Processing Instructions:
 
 Constraint: Do not give disposal advice yet. Your only job is to provide structured data for a search tool.
 
-If the input does not describe any waste items, return an empty JSON array: []
-
 Return ONLY a JSON array (no markdown fences, no explanation) where each element is:
 {
   "item_name": "string",
@@ -47,20 +45,13 @@ If multiple items are identified, return one object per item.\
 
 
 # ── Service ──────────────────────────────────────────────────────────────────
-def parse_json_response(text) -> List[Dict]:
+def parse_json_response(text: str) -> List[Dict]:
     """
     Parse JSON from Gemini's response, stripping markdown code fences if present.
 
     Gemini sometimes wraps JSON in ```json ... ``` even when told not to.
-    This handles that gracefully. Also handles list content blocks from Gemini.
+    This handles that gracefully.
     """
-    # Handle list content blocks from Gemini
-    if isinstance(text, list):
-        text = " ".join(
-            block.get("text", "") if isinstance(block, dict) else str(block)
-            for block in text
-        )
-
     cleaned = text.strip()
 
     # Strip markdown code fences
@@ -68,10 +59,6 @@ def parse_json_response(text) -> List[Dict]:
         # Remove first line (```json or ```) and last line (```)
         lines = cleaned.split("\n")
         cleaned = "\n".join(lines[1:-1]).strip()
-
-    # Return empty list if response is empty or not JSON
-    if not cleaned or not (cleaned.startswith("[") or cleaned.startswith("{")):
-        return []
 
     return json.loads(cleaned)
 
@@ -134,10 +121,6 @@ class GeminiClassificationService:
 
         response = await self.model.ainvoke([message])
         items_data = parse_json_response(response.content)
-
-        if not items_data:
-            raise ValueError("No waste items could be identified in the image.")
-
         return [WasteClassificationItem(**item) for item in items_data]
 
     async def classify_text(
@@ -166,11 +149,5 @@ class GeminiClassificationService:
         response = await self.model.ainvoke(messages)
 
         items_data = parse_json_response(response.content)
-
-        if not items_data:
-            raise ValueError(
-                "No waste items could be identified. Please describe a specific waste item, "
-                "for example: 'plastic bottle', 'old battery', or 'cardboard box'."
-            )
-
         return [WasteClassificationItem(**item) for item in items_data]
+    
