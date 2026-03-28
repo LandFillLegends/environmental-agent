@@ -30,6 +30,7 @@ async def get_location_from_ip(ip: str) -> Optional[str]:
                 if country:
                     location += f", {country}"
                 return location
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Location lookup failed for IP {ip}: {e}")
+        
     return None
