@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Google Places API
     GOOGLE_PLACES_API_KEY: Optional[str] = None
 
+    # Supabase
+    SUPABASE_URL: Optional[str] = None
+
     # Google OAuth
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
     GOOGLE_OAUTH_CLIENT_SECRET: Optional[str] = None

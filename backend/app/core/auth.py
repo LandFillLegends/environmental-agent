@@ -14,7 +14,8 @@ In production (BYPASS_AUTH=False): validates the Supabase JWT using SUPABASE_JWT
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
-from jose import jwt, JWTError
+import requests
+from jose import jwt, JWTError, jwk
 from app.core.config import settings
 
 security = HTTPBearer(auto_error=False)
@@ -41,11 +42,42 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Authorization token required")
 
     try:
+        token = credentials.credentials
+        unverified_header = jwt.get_unverified_header(token)
+        alg = unverified_header.get("alg")
+        kid = unverified_header.get("kid")
+
+        if alg == "HS256":
+            if not settings.SUPABASE_JWT_SECRET:
+                raise HTTPException(status_code=500, detail="SUPABASE_JWT_SECRET is not configured")
+            key = settings.SUPABASE_JWT_SECRET
+            algorithms = ["HS256"]
+        elif alg in ("RS256", "ES256"):
+            if not settings.SUPABASE_URL:
+                raise HTTPException(status_code=500, detail="SUPABASE_URL is required to verify RS256/ES256 tokens")
+
+            jwks_url = f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+            resp = requests.get(jwks_url, timeout=5)
+            resp.raise_for_status()
+            jwks = resp.json().get("keys", [])
+
+            key_data = next((k for k in jwks if k.get("kid") == kid), None)
+            if not key_data:
+                raise HTTPException(status_code=401, detail="No matching JWK key found")
+
+            key = jwk.construct(key_data)
+            algorithms = [alg]
+        else:
+            raise HTTPException(status_code=401, detail=f"Unsupported JWT algorithm: {alg}")
+
         payload = jwt.decode(
-            credentials.credentials,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
+            token,
+            key,
+            algorithms=algorithms,
+            options={"verify_aud": False},
         )
         return payload
     except JWTError as e:
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch Supabase JWKS: {str(e)}")
