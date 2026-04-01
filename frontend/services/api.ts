@@ -6,12 +6,10 @@
  * - __DEV__ is a React Native global that's true in development, false in production builds
  * - Auth token is pulled from Supabase session
  */
-import { ClassificationRequest, ClassificationResponse } from '@/types/classification';
 import { supabase } from '@/lib/supabase';
+import { ClassificationRequest, ClassificationResponse } from '@/types/classification';
 
-const API_BASE_URL = __DEV__
-  ? 'http://localhost:8000'
-  : process.env.EXPO_PUBLIC_API_URL;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export async function classifyWasteInput(
   request: ClassificationRequest,
