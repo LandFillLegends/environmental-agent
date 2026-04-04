@@ -72,7 +72,9 @@ export default function RootLayout() {
 
     const inTabsGroup = segments[0] === '(tabs)'
 
-    if (!session && inTabsGroup) {
+    const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true'
+
+    if (!bypassAuth && !session && inTabsGroup) {
       router.replace('/login')   // not logged in → go to login
     } else if (session && !inTabsGroup) {
       router.replace('/(tabs)')  // logged in → go to app

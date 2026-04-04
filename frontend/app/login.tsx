@@ -1,6 +1,6 @@
-import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native'
-import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
+import * as WebBrowser from 'expo-web-browser'
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { supabase } from '../lib/supabase'
 
 WebBrowser.maybeCompleteAuthSession()
