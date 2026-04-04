@@ -61,8 +61,14 @@ def store_tokens(
 ):
     db_user = db.query(User).filter(User.id == user["sub"]).first()
     if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # First sign-in via Google OAuth — create the user row automatically
+        email = user.get("email", "")
+        username = (email.split("@")[0] if email else None) or user.get("name", "user")
+        db_user = User(id=user["sub"], email=email, username=username)
+        db.add(db_user)
+
     db_user.google_access_token = tokens.google_access_token
-    db_user.google_refresh_token = tokens.google_refresh_token
+    if tokens.google_refresh_token:
+        db_user.google_refresh_token = tokens.google_refresh_token
     db.commit()
     return {"status": "tokens stored"}
