@@ -1,16 +1,14 @@
-import { useEffect, useState } from 'react'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
+import { Session } from '@supabase/supabase-js'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { useEffect, useState } from 'react'
+import { Platform, useColorScheme } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { useColorScheme, Platform } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { Session } from '@supabase/supabase-js'
 import 'react-native-reanimated'
+import { supabase } from '../lib/supabase'
 
-const API_BASE_URL = __DEV__
-  ? 'http://localhost:8000'
-  : process.env.EXPO_PUBLIC_API_URL
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL
 
 // Store Google OAuth tokens in the backend after login
 async function storeGoogleTokens(session: Session) {

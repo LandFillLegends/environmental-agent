@@ -15,7 +15,7 @@ import BottomSheet from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ClassificationResultsSheet } from '@/components/classification-results-sheet';
 import { ThemedText } from '@/components/themed-text';
@@ -23,8 +23,8 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import type { ClassificationResponse } from '@/types/classification';
 import { supabase } from '@/lib/supabase';
+import type { ClassificationResponse } from '@/types/classification';
 
 export default function HomeScreen() {
   const params = useLocalSearchParams<{ classificationResult?: string }>();
@@ -34,7 +34,7 @@ export default function HomeScreen() {
   const [username, setUsername] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const textColor = useThemeColor({}, 'text');
-  const { location: deviceLocation } = useDeviceLocation();
+  const { location: deviceLocation, loading: locationLoading } = useDeviceLocation();
 
   // Fetch username from Supabase
   useEffect(() => {
@@ -118,13 +118,19 @@ export default function HomeScreen() {
         {/* Scan button */}
         <View style={styles.scanSection}>
           <TouchableOpacity
-            style={[styles.scanButton, !!message.trim() && styles.disabledButton]}
+            style={[styles.scanButton, (!!message.trim() || locationLoading) && styles.disabledButton]}
             onPress={handleScanPress}
             activeOpacity={0.8}
-            disabled={!!message.trim()}
+            disabled={!!message.trim() || locationLoading}
           >
-            <IconSymbol name="camera.fill" size={32} color="#fff" />
-            <ThemedText style={styles.scanButtonText}>Scan Waste</ThemedText>
+            {locationLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <IconSymbol name="camera.fill" size={32} color="#fff" />
+            )}
+            <ThemedText style={styles.scanButtonText}>
+              {locationLoading ? 'Getting location...' : 'Scan Waste'}
+            </ThemedText>
           </TouchableOpacity>
         </View>
 
@@ -141,12 +147,15 @@ export default function HomeScreen() {
 
         <View style={styles.scanSection}>
           <TouchableOpacity
-            style={[styles.scanButton, !message.trim() && styles.disabledButton]}
+            style={[styles.scanButton, (!message.trim() || locationLoading) && styles.disabledButton]}
             onPress={handleTextSubmit}
-            disabled={!message.trim()}
+            disabled={!message.trim() || locationLoading}
             activeOpacity={0.8}
           >
-            <ThemedText style={styles.scanButtonText}>Describe Waste</ThemedText>
+            {locationLoading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <ThemedText style={styles.scanButtonText}>Describe Waste</ThemedText>
+            }
           </TouchableOpacity>
         </View>
 
