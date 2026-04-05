@@ -9,7 +9,7 @@ const getRedirectUrl = () => {
   if (Platform.OS === 'web') {
     return __DEV__
       ? 'http://localhost:8081'
-      : 'https://environmental-agent-seven.vercel.app'
+      : 'https://environmental-agent-theta.vercel.app'
   }
   return makeRedirectUri()
 }
