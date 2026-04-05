@@ -36,7 +36,7 @@ app.add_middleware(
 =======
     allow_origins=[
         "http://localhost:8081",                              # Expo local
-        "https://environmental-agent-two.vercel.app",         # Vercel production
+        "https://environmental-agent-theta.vercel.app",         # Vercel production
     ],
 >>>>>>> 37086bb (update frontend/backend with personal deployment urls)
     allow_credentials=True,
