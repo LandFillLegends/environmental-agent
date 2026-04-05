@@ -33,7 +33,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:8081",                              # Expo local
-        "https://environmental-agent-two.vercel.app",         # Vercel production
+        "https://environmental-agent-theta.vercel.app",         # Vercel production
     ],
     allow_credentials=True,
     allow_methods=["*"],
