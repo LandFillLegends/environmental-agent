@@ -31,7 +31,14 @@ app = FastAPI(title="Environmental Agent API", version="1.0.0")
 # CORS — allows frontend to talk to backend (configure CORS_ORIGINS in .env to override)
 app.add_middleware(
     CORSMiddleware,
+<<<<<<< HEAD
     allow_origins=settings.CORS_ORIGINS,
+=======
+    allow_origins=[
+        "http://localhost:8081",                              # Expo local
+        "https://environmental-agent-theta.vercel.app",         # Vercel production
+    ],
+>>>>>>> 4633829 (update CORS url)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
