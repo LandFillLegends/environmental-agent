@@ -73,12 +73,15 @@ export default function RootLayout() {
     const inTabsGroup = segments[0] === '(tabs)'
     const inAuthGroup = segments[0] === '(auth)'
 
-    if (!session && !inAuthGroup) {
-      router.replace('/(auth)/welcome')
-    } else if (session && inAuthGroup) {
-      router.replace('/(tabs)/home')
-    }
-  }, [session, initialized])
+const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true'
+
+if (!bypassAuth && !session && !inAuthGroup) {
+  router.replace('/(auth)/welcome')
+} else if (session && inAuthGroup) {
+  router.replace('/(tabs)/home')
+}
+    
+  },  [session, initialized, segments])
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
