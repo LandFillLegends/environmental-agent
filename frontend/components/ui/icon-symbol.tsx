@@ -15,12 +15,18 @@ type IconSymbolName = keyof typeof MAPPING;
  */
 const MAPPING = {
   'house.fill': 'home',
+  'house': 'home',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'camera.fill': 'camera-alt',
+  'camera': 'camera-alt',
   'xmark': 'close',
   'arrow.triangle.2.circlepath.camera': 'flip-camera-ios',
+  'magnifyingglass': 'search',
+  'mappin': 'place',
+  'calendar': 'calendar-today',
+  'person': 'person',
 } as IconMapping;
 
 /**

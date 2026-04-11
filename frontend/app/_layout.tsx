@@ -71,23 +71,26 @@ export default function RootLayout() {
     if (!initialized) return
 
     const inTabsGroup = segments[0] === '(tabs)'
+    const inAuthGroup = segments[0] === '(auth)'
 
-    const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true'
+const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true'
 
-    if (!bypassAuth && !session && inTabsGroup) {
-      router.replace('/login')   // not logged in → go to login
-    } else if (session && !inTabsGroup) {
-      router.replace('/(tabs)')  // logged in → go to app
-    }
-  }, [session, initialized])
+if (!bypassAuth && !session && !inAuthGroup) {
+  router.replace('/(auth)/welcome')
+} else if (session && inAuthGroup) {
+  router.replace('/(tabs)/home')
+}
+    
+  },  [session, initialized, segments])
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Screen name="(main)" options={{ headerShown: false }} />
           <Stack.Screen name="camera" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           <Stack.Screen name="loading" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           <Stack.Screen name="facility-map" options={{ presentation: 'fullScreenModal', headerShown: false }} />

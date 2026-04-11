@@ -24,6 +24,9 @@ backend/
 
    ```bash
    cd backend
+
+   python -m venv venv
+
    source venv/bin/activate
 
    venv\Scripts\activate - for windows

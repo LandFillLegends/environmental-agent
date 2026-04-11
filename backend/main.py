@@ -2,7 +2,6 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from langgraph.graph import MessageGraph
 from app.routes import user
 from app.routes.classification import router as classification_router
 from app.database import engine, Base
@@ -45,19 +44,6 @@ app.add_middleware(
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(classification_router)
 app.include_router(calendar_router)
-
-# LangGraph "Brain"
-builder = MessageGraph()
-builder.add_node("oracle", lambda state: "Hello! Your backend is officially alive.")
-builder.set_entry_point("oracle")
-builder.set_finish_point("oracle")
-agent = builder.compile()
-
-# API Endpoints
-@app.get("/chat")
-async def chat_with_agent():
-    result = await agent.ainvoke("Hi")
-    return {"reply": result[-1]}
 
 @app.get("/")
 def home():
