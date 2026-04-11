@@ -2,6 +2,7 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
 from app.routes import user
 from app.routes.classification import router as classification_router
 from app.database import engine, Base
@@ -27,14 +28,10 @@ logger.info("Database tables ensured")
 # Create the FastAPI app
 app = FastAPI(title="Environmental Agent API", version="1.0.0")
 
-# CORS — allows frontend to talk to backend
+# CORS — allows frontend to talk to backend (configure CORS_ORIGINS in .env to override)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8081",                              # Expo local
-        "https://environmental-agent-seven.vercel.app",      # Vercel production
-        "https://environmental-agent-two.vercel.app",      # Second Vercel production
-    ],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

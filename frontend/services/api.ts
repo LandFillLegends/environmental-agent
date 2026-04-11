@@ -1,6 +1,7 @@
 /**
  * API service — handles all communication with the FastAPI backend.
  */
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { ClassificationRequest, ClassificationResponse } from '@/types/classification';
 
@@ -21,6 +22,22 @@ async function handleResponse<T>(response: Response): Promise<T> {
     throw new Error(error.detail || `Request failed with status ${response.status}`);
   }
   return response.json();
+}
+
+export async function storeGoogleTokens(session: Session): Promise<void> {
+  if (!session.provider_token) return;
+  const response = await fetch(`${API_BASE_URL}/api/v1/users/store-tokens`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      google_access_token: session.provider_token,
+      google_refresh_token: session.provider_refresh_token ?? null,
+    }),
+  });
+  await handleResponse<{ status: string }>(response);
 }
 
 export async function classifyWasteInput(
@@ -53,6 +70,7 @@ export async function getSuggestedSlots(
   facilityName: string,
   facilityAddress: string,
   wasteItem: string,
+  timezone: string,
 ): Promise<SuggestSlotsResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/schedule/suggest`, {
     method: 'POST',
@@ -61,6 +79,7 @@ export async function getSuggestedSlots(
       facility_name: facilityName,
       facility_address: facilityAddress,
       waste_item: wasteItem,
+      timezone,
     }),
   });
   return handleResponse<SuggestSlotsResponse>(response);
@@ -72,6 +91,7 @@ export async function scheduleDisposal(
   date: string,
   time: string,
   wasteItem: string,
+  timezone: string,
 ): Promise<{ status: string; event: unknown }> {
   const response = await fetch(`${API_BASE_URL}/api/v1/schedule`, {
     method: 'POST',
@@ -82,6 +102,7 @@ export async function scheduleDisposal(
       date,
       time,
       waste_item: wasteItem,
+      timezone,
     }),
   });
   return handleResponse<{ status: string; event: unknown }>(response);

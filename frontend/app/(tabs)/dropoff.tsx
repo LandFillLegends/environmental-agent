@@ -47,7 +47,6 @@ export default function DropoffScreen() {
       params: {
         facilities: JSON.stringify([facility]),
         itemName,
-        materialType: facility.name,
       },
     });
   };
@@ -126,7 +125,7 @@ export default function DropoffScreen() {
                     style={styles.scheduleButton}
                     onPress={() =>
                       router.push({
-                        pathname: '/(tabs)/schedule',
+                        pathname: '/schedule-dropoff',
                         params: {
                           facility: JSON.stringify(facility),
                           wasteItem: Array.isArray(query) ? query[0] : (query ?? ''),

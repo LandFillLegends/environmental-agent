@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import * as Location from "expo-location";
 
 import { supabase } from "@/lib/supabase";
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
@@ -131,15 +133,38 @@ const menuStyles = StyleSheet.create({
 
 export default function ProfileScreen() {
   const [username, setUsername] = useState<string | null>(null);
+  const [joinDate, setJoinDate] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<string | null>(null);
 
   useEffect(() => {
+    // Pull name and join date from Supabase
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user?.user_metadata?.full_name) {
         setUsername(user.user_metadata.full_name);
       } else if (user?.email) {
         setUsername(user.email.split("@")[0]);
       }
+
+      if (user?.created_at) {
+        const d = new Date(user.created_at);
+        setJoinDate(
+          d.toLocaleString("default", { month: "short" }) + " " + d.getFullYear()
+        );
+      }
     });
+
+    // Get device location and reverse-geocode to city + region
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const { coords } = await Location.getCurrentPositionAsync({});
+      const [place] = await Location.reverseGeocodeAsync(coords);
+      if (place) {
+        const city = place.city ?? place.subregion ?? "";
+        const region = place.region ?? "";
+        setUserLocation([city, region].filter(Boolean).join(", "));
+      }
+    })();
   }, []);
 
   const handleSignOut = async () => {
@@ -163,7 +188,10 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.headerText}>
             <Text style={styles.name}>{username ?? "Maya Johnson"}</Text>
-            <Text style={styles.meta}>Seattle, WA • Joined Jan 2025</Text>
+            <Text style={styles.meta}>
+              {userLocation ?? "Location unavailable"}
+              {joinDate ? ` • Joined ${joinDate}` : ""}
+            </Text>
           </View>
         </View>
 
