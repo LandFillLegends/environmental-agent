@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:8081",
+        "https://environmental-agent-seven.vercel.app",
+        "https://environmental-agent-theta.vercel.app",
+    ]
 
     # Auth
     BYPASS_AUTH: bool = False  # Set to True locally for testing without OAuth
@@ -44,5 +49,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 settings = Settings()

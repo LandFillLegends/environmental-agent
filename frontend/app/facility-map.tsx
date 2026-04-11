@@ -91,7 +91,7 @@ export default function FacilityMapScreen() {
           </ThemedText>
           {itemName && (
             <ThemedText style={styles.headerSubtitle}>
-              for {itemName} ({materialType})
+              for {itemName}{materialType ? ` (${materialType})` : ''}
             </ThemedText>
           )}
         </View>

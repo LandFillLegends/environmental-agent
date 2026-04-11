@@ -7,29 +7,7 @@ import { Platform, useColorScheme } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import 'react-native-reanimated'
 import { supabase } from '../lib/supabase'
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL
-
-// Store Google OAuth tokens in the backend after login
-async function storeGoogleTokens(session: Session) {
-  if (!session.provider_token) return  // no Google token, skip
-
-  try {
-    await fetch(`${API_BASE_URL}/api/v1/users/store-tokens`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        google_access_token: session.provider_token,
-        google_refresh_token: session.provider_refresh_token ?? null,
-      }),
-    })
-  } catch (e) {
-    console.error('Failed to store Google tokens:', e)
-  }
-}
+import { storeGoogleTokens } from '@/services/api'
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
@@ -70,18 +48,15 @@ export default function RootLayout() {
   useEffect(() => {
     if (!initialized) return
 
-    const inTabsGroup = segments[0] === '(tabs)'
     const inAuthGroup = segments[0] === '(auth)'
+    const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true'
 
-const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true'
-
-if (!bypassAuth && !session && !inAuthGroup) {
-  router.replace('/(auth)/welcome')
-} else if (session && inAuthGroup) {
-  router.replace('/(tabs)/home')
-}
-    
-  },  [session, initialized, segments])
+    if (!bypassAuth && !session && !inAuthGroup) {
+      router.replace('/(auth)/welcome')
+    } else if (session && inAuthGroup) {
+      router.replace('/(tabs)/home')
+    }
+  }, [session, initialized, segments])
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -94,6 +69,7 @@ if (!bypassAuth && !session && !inAuthGroup) {
           <Stack.Screen name="camera" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           <Stack.Screen name="loading" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           <Stack.Screen name="facility-map" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+          <Stack.Screen name="schedule-dropoff" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

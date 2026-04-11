@@ -1,10 +1,8 @@
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel
@@ -13,7 +11,11 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.database import get_db
-from app.models.user import User
+from app.services.google_auth import (
+    build_google_credentials,
+    get_user_with_google_tokens,
+    refresh_credentials_if_needed,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["calendar"])
@@ -27,11 +29,13 @@ class ScheduleRequest(BaseModel):
     date: str       # ISO format e.g. "2026-04-07"
     time: str       # e.g. "10:00"
     waste_item: str
+    timezone: str = "America/New_York"
 
 class SuggestSlotsRequest(BaseModel):
     facility_name: str
     facility_address: str
     waste_item: str
+    timezone: str = "America/New_York"
 
 class SlotSuggestion(BaseModel):
     date: str         # "2026-04-07"
@@ -45,43 +49,6 @@ class SuggestSlotsResponse(BaseModel):
     suggestions: list[SlotSuggestion]
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _build_credentials(db_user: User) -> Credentials:
-    creds = Credentials(
-        token=db_user.google_access_token,
-        refresh_token=db_user.google_refresh_token,
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=settings.GOOGLE_OAUTH_CLIENT_ID,
-        client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
-    )
-    return creds
-
-
-def _refresh_if_needed(creds: Credentials, db_user: User, db: Session) -> Credentials:
-    if not creds.valid:
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            db_user.google_access_token = creds.token
-            db_user.google_token_expiry = creds.expiry
-            db.commit()
-        else:
-            raise HTTPException(status_code=401, detail="Google credential invalid or expired")
-    return creds
-
-
-def _get_user_with_tokens(user: dict, db: Session) -> User:
-    db_user = db.query(User).filter(User.id == user["sub"]).first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if not db_user.google_refresh_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Google Calendar not connected. Please reconnect your Google account.",
-        )
-    return db_user
-
-
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.post("/schedule/suggest", response_model=SuggestSlotsResponse)
@@ -93,31 +60,39 @@ async def suggest_schedule_slots(
     """
     Agentic scheduling: fetch the user's Google Calendar for the next 7 days,
     pass existing events to Gemini, and return 5 conflict-aware time suggestions.
+    Falls back to generating suggestions without calendar data if Google Calendar
+    is not connected or the user record is not found.
     """
     try:
-        db_user = _get_user_with_tokens(user, db)
-        creds = _refresh_if_needed(_build_credentials(db_user), db_user, db)
-
-        # Fetch next 7 days of calendar events
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         week_later = now + timedelta(days=7)
-        calendar_service = build("calendar", "v3", credentials=creds)
-        events_result = calendar_service.events().list(
-            calendarId="primary",
-            timeMin=now.isoformat() + "Z",
-            timeMax=week_later.isoformat() + "Z",
-            singleEvents=True,
-            orderBy="startTime",
-        ).execute()
+        existing_events: list[dict] = []
 
-        existing_events = [
-            {
-                "title": e.get("summary", "Busy"),
-                "start": e.get("start", {}).get("dateTime", e.get("start", {}).get("date", "")),
-                "end":   e.get("end",   {}).get("dateTime", e.get("end",   {}).get("date", "")),
-            }
-            for e in events_result.get("items", [])
-        ]
+        # Attempt to read Google Calendar — silently degrade if unavailable
+        try:
+            db_user = get_user_with_google_tokens(user, db)
+            creds = refresh_credentials_if_needed(build_google_credentials(db_user), db_user, db)
+            calendar_service = build("calendar", "v3", credentials=creds)
+            events_result = calendar_service.events().list(
+                calendarId="primary",
+                timeMin=now.isoformat() + "Z",
+                timeMax=week_later.isoformat() + "Z",
+                singleEvents=True,
+                orderBy="startTime",
+            ).execute()
+            existing_events = [
+                {
+                    "title": e.get("summary", "Busy"),
+                    "start": e.get("start", {}).get("dateTime", e.get("start", {}).get("date", "")),
+                    "end":   e.get("end",   {}).get("dateTime", e.get("end",   {}).get("date", "")),
+                }
+                for e in events_result.get("items", [])
+            ]
+        except HTTPException:
+            logger.info(
+                "Suggest slots — Google Calendar unavailable for user=%s, proceeding without events",
+                user.get("sub"),
+            )
 
         logger.info(
             "Suggest slots — user=%s facility=%r item=%r existing_events=%d",
@@ -133,6 +108,7 @@ async def suggest_schedule_slots(
         prompt = f"""You are a scheduling assistant helping someone drop off a waste item at a facility.
 
 Today (UTC): {now.strftime("%Y-%m-%d %H:%M")}
+User's timezone: {request.timezone}
 Facility: {request.facility_name} — {request.facility_address}
 Waste item: {request.waste_item}
 
@@ -188,8 +164,8 @@ async def schedule_disposal(
 ):
     """Create a 1-hour Google Calendar event for a facility drop-off."""
     try:
-        db_user = _get_user_with_tokens(user, db)
-        creds = _refresh_if_needed(_build_credentials(db_user), db_user, db)
+        db_user = get_user_with_google_tokens(user, db)
+        creds = refresh_credentials_if_needed(build_google_credentials(db_user), db_user, db)
 
         try:
             start_dt = datetime.fromisoformat(f"{request.date}T{request.time}")
@@ -202,8 +178,8 @@ async def schedule_disposal(
             "summary": f"Dispose: {request.waste_item}",
             "location": request.facility_address,
             "description": f"Drop off {request.waste_item} at {request.facility_name}",
-            "start": {"dateTime": start_dt.isoformat(), "timeZone": "America/New_York"},
-            "end":   {"dateTime": end_dt.isoformat(),   "timeZone": "America/New_York"},
+            "start": {"dateTime": start_dt.isoformat(), "timeZone": request.timezone},
+            "end":   {"dateTime": end_dt.isoformat(),   "timeZone": request.timezone},
         }
 
         calendar_service = build("calendar", "v3", credentials=creds)
