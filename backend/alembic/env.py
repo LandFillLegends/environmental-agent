@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.database import Base
-from app.models import user  # Import all your models here
+from app.models import user, disposal_cache  # Import all your models here
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
