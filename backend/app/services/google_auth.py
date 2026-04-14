@@ -60,7 +60,7 @@ def get_user_with_google_tokens(user: dict, db: Session) -> User:
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=500
+            status_code=500,
             detail="Sorry, something went wrong with Google Calendar integration. Please try again.",
         )
     
