@@ -18,7 +18,7 @@ export default function LoadingScreen() {
         toValue: 1,
         duration: 1200,
         easing: Easing.linear,
-        useNativeDriver: true,
+        useNativeDriver: false,
       })
     ).start();
   }, []);
@@ -66,12 +66,9 @@ export default function LoadingScreen() {
           <Animated.View style={[styles.spinnerArc, { transform: [{ rotate: spin }] }]} />
         </View>
 
-        {/* Title + subtitle */}
-        <Text style={styles.title}>Analyzing</Text>
-        <Text style={styles.subtitle}>"{itemLabel}"</Text>
-
         {/* Dynamic status from stream */}
-        <Text style={styles.statusLabel}>{currentLabel}</Text>
+        <Text style={styles.title}>{currentLabel}</Text>
+        <Text style={styles.subtitle}>"{itemLabel}"</Text>
       </View>
     </SafeAreaView>
   );
@@ -131,12 +128,4 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
 
-  // Dynamic status
-  statusLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.textSecondary,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    textAlign: 'center',
-    marginTop: SPACING.xs,
-  },
 });
