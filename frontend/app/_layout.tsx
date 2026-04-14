@@ -1,3 +1,4 @@
+import { storeGoogleTokens } from '@/services/api'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
 import { Session } from '@supabase/supabase-js'
 import { Stack, useRouter, useSegments } from 'expo-router'
@@ -7,7 +8,6 @@ import { Platform, useColorScheme } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import 'react-native-reanimated'
 import { supabase } from '../lib/supabase'
-import { storeGoogleTokens } from '@/services/api'
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
@@ -30,7 +30,11 @@ export default function RootLayout() {
 
         // Store Google tokens when user signs in
         if (_event === 'SIGNED_IN' && session) {
-          await storeGoogleTokens(session)
+          try {
+            await storeGoogleTokens(session)
+          } catch (e) {
+            console.error('Failed to store Google tokens:', e)
+          }
         }
       }
     )
