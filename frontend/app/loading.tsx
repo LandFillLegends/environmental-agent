@@ -1,22 +1,14 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BORDER_RADIUS, COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { classifyWasteStream } from '@/services/api';
-
-const STEPS: { label: string; icon: React.ComponentProps<typeof MaterialIcons>['name'] }[] = [
-  { label: 'Identifying item...', icon: 'sync' },
-  { label: 'Checking local rules...', icon: 'place' },
-  { label: 'Preparing guidance...', icon: 'check-circle-outline' },
-];
 
 export default function LoadingScreen() {
   const params = useLocalSearchParams<{ image_base64?: string; message?: string; location?: string }>();
-  const [activeStep, setActiveStep] = useState(0);
-  const [stepLabels, setStepLabels] = useState<Record<number, string>>({});
+  const [currentLabel, setCurrentLabel] = useState('Analyzing your item...');
   const spinAnim = useRef(new Animated.Value(0)).current;
 
   // Main ring spin
@@ -31,7 +23,7 @@ export default function LoadingScreen() {
     ).start();
   }, []);
 
-  // API call — steps advance from real SSE events as each pipeline node completes
+  // API call — label updates from real SSE events as each pipeline node completes
   useEffect(() => {
     const classify = async () => {
       try {
@@ -41,9 +33,8 @@ export default function LoadingScreen() {
             message: params.message ?? null,
             location: params.location ?? null,
           },
-          (step, label) => {
-            setActiveStep(step);
-            if (label) setStepLabels(prev => ({ ...prev, [step]: label }));
+          (_step, label) => {
+            if (label) setCurrentLabel(label);
           },
         );
         router.replace({
@@ -79,28 +70,8 @@ export default function LoadingScreen() {
         <Text style={styles.title}>Analyzing</Text>
         <Text style={styles.subtitle}>"{itemLabel}"</Text>
 
-        {/* Steps */}
-        <View style={styles.steps}>
-          {STEPS.map((step, i) => {
-            const isActive = activeStep === i;
-            return (
-              <View key={i} style={[styles.stepRow, isActive && styles.stepRowActive]}>
-                {isActive ? (
-                  <ActivityIndicator size={20} color={COLORS.primary} />
-                ) : (
-                  <MaterialIcons
-                    name={step.icon}
-                    size={20}
-                    color={COLORS.textSecondary}
-                  />
-                )}
-                <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
-                  {stepLabels[i] ?? step.label}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
+        {/* Dynamic status from stream */}
+        <Text style={styles.statusLabel}>{currentLabel}</Text>
       </View>
     </SafeAreaView>
   );
@@ -160,30 +131,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
 
-  // Steps
-  steps: {
-    width: '100%',
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.sm + 4,
-    paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-  },
-  stepRowActive: {
-    backgroundColor: COLORS.accentLight,
-  },
-  stepLabel: {
+  // Dynamic status
+  statusLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
-  },
-  stepLabelActive: {
-    color: COLORS.text,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    textAlign: 'center',
+    marginTop: SPACING.xs,
   },
 });
