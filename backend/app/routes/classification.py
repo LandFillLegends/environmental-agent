@@ -1,13 +1,16 @@
 """
 Waste classification API routes.
 
-POST /api/v1/classify  — accepts a base64 image or text, invokes agentic loop, returns classification + disposal instructions
+POST /api/v1/classify        — accepts a base64 image or text, invokes agentic loop, returns classification + disposal instructions
+POST /api/v1/classify/stream — same pipeline, streams SSE progress events as each LangGraph node completes
 """
 
+import json
 import logging
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from app.core.auth import get_current_user
 from app.schemas.classification import (
@@ -96,3 +99,78 @@ async def classify_waste_input(
     except Exception as e:
         logger.error("Unexpected error during classification: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Classification failed: {e}")
+
+
+@router.post("/classify/stream")
+async def classify_waste_stream(
+    request: ClassificationRequest,
+    raw_request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Same pipeline as /classify but streams SSE progress events as each node completes.
+
+    Events:
+      {"type": "step", "step": 0}  — classification started
+      {"type": "step", "step": 1}  — item identified, searching local rules
+      {"type": "step", "step": 2}  — disposal agent finished, preparing response
+      {"type": "done", "result": {...}}  — full ClassificationResponse payload
+      {"type": "error", "message": "..."}  — pipeline failed
+    """
+    start_time = time.time()
+
+    location = request.location
+    if not location:
+        forwarded_for = raw_request.headers.get("X-Forwarded-For", "")
+        client_ip = forwarded_for.split(",")[0].strip() or raw_request.client.host
+        location = await get_location_from_ip(client_ip)
+
+    logger.info(
+        "Stream classify request — has_image=%s has_message=%s location=%r",
+        bool(request.image_base64), bool(request.message), location,
+    )
+
+    async def generate():
+        items = []
+        disposal_instructions = []
+
+        yield f"data: {json.dumps({'type': 'step', 'step': 0})}\n\n"
+
+        try:
+            async for chunk in agent.astream(
+                {
+                    "image_base64": request.image_base64,
+                    "message": request.message,
+                    "location": location,
+                },
+                stream_mode="updates",
+            ):
+                node_name = next(iter(chunk))
+                node_output = chunk[node_name]
+
+                if node_name in ("image_classification", "text_classification"):
+                    items = node_output.get("items", [])
+                    yield f"data: {json.dumps({'type': 'step', 'step': 1})}\n\n"
+
+                elif node_name == "disposal_agent" and node_output.get("disposal_instructions"):
+                    disposal_instructions = node_output["disposal_instructions"]
+                    yield f"data: {json.dumps({'type': 'step', 'step': 2})}\n\n"
+
+            processing_time_ms = (time.time() - start_time) * 1000
+            result = ClassificationResponse(
+                items=items,
+                disposal_instructions=disposal_instructions,
+                total_items=len(items),
+                processing_time_ms=processing_time_ms,
+            )
+            yield f"data: {json.dumps({'type': 'done', 'result': result.model_dump(mode='json')})}\n\n"
+
+        except Exception as e:
+            logger.error("Stream classification error: %s", e, exc_info=True)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
