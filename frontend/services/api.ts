@@ -51,6 +51,50 @@ export async function classifyWasteInput(
   return handleResponse<ClassificationResponse>(response);
 }
 
+export async function classifyWasteStream(
+  request: ClassificationRequest,
+  onStep: (step: number) => void,
+): Promise<ClassificationResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/classify/stream`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Request failed with status ${response.status}`);
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const event = JSON.parse(line.slice(6));
+
+      if (event.type === 'step') {
+        onStep(event.step);
+      } else if (event.type === 'done') {
+        return event.result as ClassificationResponse;
+      } else if (event.type === 'error') {
+        throw new Error(event.message);
+      }
+    }
+  }
+
+  throw new Error('Stream ended without a result');
+}
+
 // ── Scheduling ─────────────────────────────────────────────────────────────────
 
 export interface SlotSuggestion {

@@ -4,16 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { classifyWasteInput } from '@/services/api';
 import { BORDER_RADIUS, COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { classifyWasteStream } from '@/services/api';
 
 const STEPS: { label: string; icon: React.ComponentProps<typeof MaterialIcons>['name'] }[] = [
   { label: 'Identifying item...', icon: 'sync' },
   { label: 'Checking local rules...', icon: 'place' },
   { label: 'Preparing guidance...', icon: 'check-circle-outline' },
 ];
-
-const STEP_DELAYS = [4000, 10000];
 
 export default function LoadingScreen() {
   const params = useLocalSearchParams<{ image_base64?: string; message?: string; location?: string }>();
@@ -32,23 +30,18 @@ export default function LoadingScreen() {
     ).start();
   }, []);
 
-  // Step progression
-  useEffect(() => {
-    const timers = STEP_DELAYS.map((delay, i) =>
-      setTimeout(() => setActiveStep(i + 1), delay)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
-  // API call
+  // API call — steps advance from real SSE events as each pipeline node completes
   useEffect(() => {
     const classify = async () => {
       try {
-        const response = await classifyWasteInput({
-          image_base64: params.image_base64 ?? null,
-          message: params.message ?? null,
-          location: params.location ?? null,
-        });
+        const response = await classifyWasteStream(
+          {
+            image_base64: params.image_base64 ?? null,
+            message: params.message ?? null,
+            location: params.location ?? null,
+          },
+          setActiveStep,
+        );
         router.replace({
           pathname: '/(main)/results',
           params: { result: JSON.stringify(response) },
