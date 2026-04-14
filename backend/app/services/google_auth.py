@@ -44,15 +44,24 @@ def get_user_with_google_tokens(user: dict, db: Session) -> User:
     Load the DB user and assert they have a Google refresh token.
     Raises 401 if the user is not found or has not connected Google Calendar.
     """
-    db_user = db.query(User).filter(User.id == user["sub"]).first()
-    if not db_user:
+    try:
+        db_user = db.query(User).filter(User.id == user["sub"]).first()
+
+        if not db_user:
+            raise HTTPException(
+                status_code=401,
+                detail="Google Calendar not connected. Please sign in and connect your Google account.",
+            )
+        if not db_user.google_refresh_token:
+            raise HTTPException(
+                status_code=401,
+                detail="Google Calendar not connected. Please reconnect your Google account.",
+            )
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=401,
-            detail="Google Calendar not connected. Please sign in and connect your Google account.",
+            status_code=500
+            detail="Sorry, something went wrong with Google Calendar integration. Please try again.",
         )
-    if not db_user.google_refresh_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Google Calendar not connected. Please reconnect your Google account.",
-        )
+    
     return db_user
