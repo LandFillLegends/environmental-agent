@@ -26,6 +26,11 @@ export default function LoginScreen() {
       options: {
         redirectTo: redirectUrl,
         skipBrowserRedirect: Platform.OS !== 'web',
+        scopes: 'https://www.googleapis.com/auth/calendar',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
 

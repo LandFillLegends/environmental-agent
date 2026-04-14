@@ -30,7 +30,11 @@ export default function RootLayout() {
 
         // Store Google tokens when user signs in
         if (_event === 'SIGNED_IN' && session) {
-          await storeGoogleTokens(session)
+          try {
+            await storeGoogleTokens(session)
+          } catch (e) {
+            console.error('Failed to store Google tokens:', e)
+          }
         }
       }
     )
