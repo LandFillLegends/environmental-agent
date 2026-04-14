@@ -16,6 +16,7 @@ const STEPS: { label: string; icon: React.ComponentProps<typeof MaterialIcons>['
 export default function LoadingScreen() {
   const params = useLocalSearchParams<{ image_base64?: string; message?: string; location?: string }>();
   const [activeStep, setActiveStep] = useState(0);
+  const [stepLabels, setStepLabels] = useState<Record<number, string>>({});
   const spinAnim = useRef(new Animated.Value(0)).current;
 
   // Main ring spin
@@ -40,7 +41,10 @@ export default function LoadingScreen() {
             message: params.message ?? null,
             location: params.location ?? null,
           },
-          setActiveStep,
+          (step, label) => {
+            setActiveStep(step);
+            if (label) setStepLabels(prev => ({ ...prev, [step]: label }));
+          },
         );
         router.replace({
           pathname: '/(main)/results',
@@ -91,7 +95,7 @@ export default function LoadingScreen() {
                   />
                 )}
                 <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
-                  {step.label}
+                  {stepLabels[i] ?? step.label}
                 </Text>
               </View>
             );

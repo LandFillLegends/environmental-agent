@@ -53,7 +53,7 @@ export async function classifyWasteInput(
 
 export async function classifyWasteStream(
   request: ClassificationRequest,
-  onStep: (step: number) => void,
+  onStep: (step: number, label: string) => void,
 ): Promise<ClassificationResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/classify/stream`, {
     method: 'POST',
@@ -83,7 +83,7 @@ export async function classifyWasteStream(
       const event = JSON.parse(line.slice(6));
 
       if (event.type === 'step') {
-        onStep(event.step);
+        onStep(event.step, event.label ?? '');
       } else if (event.type === 'done') {
         return event.result as ClassificationResponse;
       } else if (event.type === 'error') {
