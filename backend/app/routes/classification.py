@@ -111,11 +111,9 @@ async def classify_waste_stream(
     Same pipeline as /classify but streams SSE progress events as each node completes.
 
     Events:
-      {"type": "step", "step": 0}  — classification started
-      {"type": "step", "step": 1}  — item identified, searching local rules
-      {"type": "step", "step": 2}  — disposal agent finished, preparing response
-      {"type": "done", "result": {...}}  — full ClassificationResponse payload
-      {"type": "error", "message": "..."}  — pipeline failed
+      {"type": "step", "step": N, "label": "..."}  — node completed, with a context-aware label
+      {"type": "done", "result": {...}}              — full ClassificationResponse payload
+      {"type": "error", "message": "..."}            — pipeline failed
     """
     start_time = time.time()
 
@@ -134,7 +132,7 @@ async def classify_waste_stream(
         items = []
         disposal_instructions = []
 
-        yield f"data: {json.dumps({'type': 'step', 'step': 0})}\n\n"
+        yield f"data: {json.dumps({'type': 'step', 'step': 0, 'label': 'Analyzing your item...'})}\n\n"
 
         try:
             async for chunk in agent.astream(
@@ -150,11 +148,20 @@ async def classify_waste_stream(
 
                 if node_name in ("image_classification", "text_classification"):
                     items = node_output.get("items", [])
-                    yield f"data: {json.dumps({'type': 'step', 'step': 1})}\n\n"
+                    if items:
+                        item_desc = items[0].item_name if len(items) == 1 else f"{len(items)} items"
+                        loc_desc = f" in {location}" if location else ""
+                        label = f"Found {item_desc} — checking local rules{loc_desc}..."
+                    else:
+                        label = "Checking local disposal rules..."
+                    yield f"data: {json.dumps({'type': 'step', 'step': 1, 'label': label})}\n\n"
+
+                elif node_name == "tools":
+                    yield f"data: {json.dumps({'type': 'step', 'step': 1, 'label': 'Searching for nearby disposal options...'})}\n\n"
 
                 elif node_name == "disposal_agent" and node_output.get("disposal_instructions"):
                     disposal_instructions = node_output["disposal_instructions"]
-                    yield f"data: {json.dumps({'type': 'step', 'step': 2})}\n\n"
+                    yield f"data: {json.dumps({'type': 'step', 'step': 2, 'label': 'Building your disposal plan...'})}\n\n"
 
             processing_time_ms = (time.time() - start_time) * 1000
             result = ClassificationResponse(
