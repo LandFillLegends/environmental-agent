@@ -75,8 +75,8 @@ async def suggest_schedule_slots(
             calendar_service = build("calendar", "v3", credentials=creds)
             events_result = calendar_service.events().list(
                 calendarId="primary",
-                timeMin=now.isoformat() + "Z",
-                timeMax=week_later.isoformat() + "Z",
+                timeMin=now.isoformat(),
+                timeMax=week_later.isoformat(),
                 singleEvents=True,
                 orderBy="startTime",
             ).execute()
@@ -88,9 +88,9 @@ async def suggest_schedule_slots(
                 }
                 for e in events_result.get("items", [])
             ]
-        except HTTPException:
+        except HTTPException as e:
             logger.info(
-                "Suggest slots — Google Calendar unavailable for user=%s, proceeding without events",
+                f"Suggest slots — Google Calendar unavailable for user=%s, proceeding without events (message: {e}))",
                 user.get("sub"),
             )
 
