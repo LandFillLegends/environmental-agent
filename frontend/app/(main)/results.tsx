@@ -1,7 +1,8 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,14 +14,39 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BORDER_RADIUS, COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '@/constants/theme';
-import type { ClassificationResponse } from '@/types/classification';
+import { getSuggestedSlots, scheduleDisposal, SlotSuggestion } from '@/services/api';
+import type { ClassificationResponse, DisposalFacility } from '@/types/classification';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+type SchedulePhase =
+  | { phase: 'idle' }
+  | { phase: 'loading'; itemIndex: number }
+  | {
+      phase: 'suggesting';
+      itemIndex: number;
+      facility: DisposalFacility;
+      slot: SlotSuggestion;
+      allFacilities: DisposalFacility[];
+      itemName: string;
+    }
+  | {
+      phase: 'confirming';
+      itemIndex: number;
+      facility: DisposalFacility;
+      slot: SlotSuggestion;
+      allFacilities: DisposalFacility[];
+      itemName: string;
+    }
+  | { phase: 'success'; itemIndex: number; facilityName: string; slot: SlotSuggestion };
+
 export default function ResultsScreen() {
   const { result } = useLocalSearchParams<{ result?: string }>();
+  const [scheduleState, setScheduleState] = useState<SchedulePhase>({ phase: 'idle' });
 
   const data = useMemo<ClassificationResponse | null>(() => {
     const raw = Array.isArray(result) ? result[0] : result;
@@ -31,6 +57,46 @@ export default function ResultsScreen() {
       return null;
     }
   }, [result]);
+
+  const handleSchedule = async (itemIndex: number, facilities: DisposalFacility[], itemName: string) => {
+    // Pick best facility by rating, fall back to first
+    const best = [...facilities].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+    setScheduleState({ phase: 'loading', itemIndex });
+    try {
+      const res = await getSuggestedSlots(best.name, best.address, itemName, userTimezone);
+      const recommended = res.suggestions.find((s) => s.label === 'Recommended') ?? res.suggestions[0];
+      setScheduleState({
+        phase: 'suggesting',
+        itemIndex,
+        facility: best,
+        slot: recommended,
+        allFacilities: facilities,
+        itemName,
+      });
+    } catch {
+      // Fall back to manual selection on error
+      router.push({
+        pathname: '/(tabs)/dropoff',
+        params: { query: itemName, facilities: JSON.stringify(facilities) },
+      });
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (scheduleState.phase !== 'suggesting') return;
+    const { itemIndex, facility, slot, allFacilities, itemName } = scheduleState;
+    setScheduleState({ phase: 'confirming', itemIndex, facility, slot, allFacilities, itemName });
+    try {
+      await scheduleDisposal(facility.name, facility.address, slot.date, slot.time, itemName, userTimezone);
+      setScheduleState({ phase: 'success', itemIndex, facilityName: facility.name, slot });
+    } catch {
+      // Fall back to manual flow on error
+      router.push({
+        pathname: '/(tabs)/dropoff',
+        params: { query: itemName, facilities: JSON.stringify(allFacilities) },
+      });
+    }
+  };
 
   if (!data) {
     return (
@@ -71,6 +137,20 @@ export default function ResultsScreen() {
             const isSoiled = item?.is_soiled ?? false;
             const location = item?.location;
             const hasFacilities = instruction.facilities.length > 0;
+
+            const isLoading = scheduleState.phase === 'loading' && scheduleState.itemIndex === i;
+            const isSuggesting = scheduleState.phase === 'suggesting' && scheduleState.itemIndex === i;
+            const isConfirming = scheduleState.phase === 'confirming' && scheduleState.itemIndex === i;
+            const isSuccess = scheduleState.phase === 'success' && scheduleState.itemIndex === i;
+
+            // Safe access to suggestion/success data for this item
+            const suggestion =
+              (isSuggesting || isConfirming)
+                ? (scheduleState as Extract<SchedulePhase, { phase: 'suggesting' | 'confirming' }>)
+                : null;
+            const success = isSuccess
+              ? (scheduleState as Extract<SchedulePhase, { phase: 'success' }>)
+              : null;
 
             return (
               <View key={i} style={styles.card}>
@@ -121,24 +201,88 @@ export default function ResultsScreen() {
                   <Text style={styles.locationText}>Location: {location}</Text>
                 ) : null}
 
-                {/* Facilities CTA */}
+                {/* Facilities CTA — three states: default button / suggestion card / success */}
                 {hasFacilities && (
-                  <TouchableOpacity
-                    style={styles.facilitiesButton}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(tabs)/dropoff',
-                        params: {
-                          query: instruction.item_name,
-                          facilities: JSON.stringify(instruction.facilities),
-                        },
-                      })
-                    }
-                    activeOpacity={0.85}
-                  >
-                    <MaterialIcons name="place" size={18} color="#fff" />
-                    <Text style={styles.facilitiesButtonText}>View Nearby Facilities</Text>
-                  </TouchableOpacity>
+                  isSuccess && success ? (
+                    <View style={styles.successCard}>
+                      <View style={styles.successRow}>
+                        <MaterialIcons name="check-circle" size={18} color={COLORS.primary} />
+                        <Text style={styles.successLabel}>Scheduled!</Text>
+                      </View>
+                      <Text style={styles.successDetail}>{success.facilityName}</Text>
+                      <Text style={styles.successTime}>
+                        {success.slot.day_display} at {success.slot.time_display}
+                      </Text>
+                    </View>
+                  ) : suggestion ? (
+                    <View style={styles.suggestionCard}>
+                      <View style={styles.suggestionHeader}>
+                        <MaterialIcons name="auto-awesome" size={15} color={COLORS.primary} />
+                        <Text style={styles.suggestionHeaderText}>I suggest scheduling at:</Text>
+                      </View>
+                      <Text style={styles.suggestionFacility}>{suggestion.facility.name}</Text>
+                      <Text style={styles.suggestionAddress}>{suggestion.facility.address}</Text>
+                      <View style={styles.suggestionTimeRow}>
+                        <MaterialIcons name="schedule" size={13} color={COLORS.textSecondary} />
+                        <Text style={styles.suggestionTime}>
+                          {suggestion.slot.day_display} at {suggestion.slot.time_display}
+                        </Text>
+                      </View>
+                      {suggestion.slot.reason ? (
+                        <Text style={styles.suggestionReason}>{suggestion.slot.reason}</Text>
+                      ) : null}
+                      <View style={styles.suggestionActions}>
+                        <TouchableOpacity
+                          style={[styles.confirmButton, isConfirming && styles.buttonDisabled]}
+                          onPress={handleConfirm}
+                          disabled={isConfirming}
+                          activeOpacity={0.85}
+                        >
+                          {isConfirming ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <>
+                              <MaterialIcons name="event" size={15} color="#fff" />
+                              <Text style={styles.confirmButtonText}>Confirm</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.moreOptionsButton, isConfirming && styles.buttonDisabled]}
+                          disabled={isConfirming}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/(tabs)/dropoff',
+                              params: {
+                                query: instruction.item_name,
+                                facilities: JSON.stringify(instruction.facilities),
+                              },
+                            })
+                          }
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.moreOptionsText}>More options</Text>
+                          <MaterialIcons name="chevron-right" size={15} color={COLORS.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.facilitiesButton}
+                      onPress={() => handleSchedule(i, instruction.facilities, instruction.item_name)}
+                      disabled={isLoading}
+                      activeOpacity={0.85}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <MaterialIcons name="calendar-today" size={18} color="#fff" />
+                          <Text style={styles.facilitiesButtonText}>Schedule Drop-Off</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )
                 )}
               </View>
             );
@@ -256,7 +400,7 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
   },
 
-  // Facilities button
+  // Facilities button (default state)
   facilitiesButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -270,6 +414,121 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: '#fff',
+  },
+
+  // Agent suggestion card
+  suggestionCard: {
+    backgroundColor: COLORS.accentLight,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    gap: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  suggestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: 2,
+  },
+  suggestionHeaderText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  suggestionFacility: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text,
+  },
+  suggestionAddress: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+  },
+  suggestionTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  suggestionTime: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text,
+  },
+  suggestionReason: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  suggestionActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.xs,
+  },
+  confirmButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.sm,
+  },
+  confirmButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: '#fff',
+  },
+  moreOptionsButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+  },
+  moreOptionsText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.primary,
+  },
+  buttonDisabled: { opacity: 0.6 },
+
+  // Inline success state
+  successCard: {
+    backgroundColor: COLORS.accentLight,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  successRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  successLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.primary,
+  },
+  successDetail: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  successTime: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
   },
 
   // Primary button (error state)

@@ -234,6 +234,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.text,
     padding: 0,
+    outlineWidth: 0,
   },
   actionRow: {
     flexDirection: 'row',
