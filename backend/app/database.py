@@ -7,7 +7,7 @@ from app.core.config import settings
 # Create database engine
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"sslmode": "require"},
+    connect_args={"sslmode": "disable"},  # Use "require" for production with SSL
     pool_pre_ping=True
 )
 

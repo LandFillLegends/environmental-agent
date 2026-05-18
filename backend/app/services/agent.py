@@ -16,6 +16,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langchain_tavily import TavilySearch
 from app.core.config import settings
+from app.services.cache_service import cache_lookup_tool
 
 ## Set up classification service and states
 gemini_service = GeminiClassificationService()
@@ -53,27 +54,34 @@ search_tool = TavilySearch(
     tavily_api_key=settings.TAVILY_API_KEY
 )
 
-# Gemini model with tool bound
+# Gemini model with both search AND cache tools
 model_with_tools = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=settings.GEMINI_API_KEY,
-).bind_tools([search_tool])
+).bind_tools([search_tool, cache_lookup_tool])
 
 
 DISPOSAL_PROMPT = """\
-You are a Waste Disposal Advisor with access to a web search tool.
+You are a Waste Disposal Advisor with access to two tools:
+1. cache_lookup_tool - Check if disposal instructions are already cached
+2. TavilySearch - Search the web for current disposal regulations
 
 User location: {location}
 
-Your job:
-1. Search for CURRENT, LOCAL disposal regulations for each item below.
-   Use the provided search_query + the user's location for precise local results.
-2. If your first search is too generic, search again with a more specific query.
-   e.g. "{location} recycling program" or "{location} hazardous waste drop-off"
-3. Only stop searching when you have specific local policy information.
-4. Also search for 1-3 nearby disposal/recycling facilities where the user can
-   bring each item. Include the facility's full name and complete street address.
-5. Return ONLY a JSON array (no markdown fences) where each element is:
+**Workflow:**
+1. FIRST, use cache_lookup_tool to check if we have recent data for each item.
+2. If cache HIT and data is <7 days old: Use cached instructions (fast, accurate).
+3. If cache HIT but data is >7 days old: Consider verifying with TavilySearch.
+4. If cache MISS: Use TavilySearch to find CURRENT, LOCAL disposal regulations.
+5. If searching the web, use location + item-specific queries for precise local results.
+
+**Your job:**
+- For each waste item below, decide: use cache, search web, or both?
+- If searching: use the provided search_query + location for targeted results
+- Only stop when you have specific local disposal information
+- Also find 1-3 nearby disposal/recycling facilities with full address
+
+Return ONLY a JSON array (no markdown fences) where each element is:
 {{
   "item_name": "string (must match input)",
   "material_type": "string (must match input)",
@@ -222,7 +230,24 @@ async def disposal_agent_node(state: OverallState) -> dict:
                     inst.get("item_name"),
                     [{"name": f.name, "address": f.address, "lat": f.latitude, "lng": f.longitude} for f in enriched],
                 )
-                instructions.append(DisposalInstruction(**inst, facilities=enriched))
+                instruction = DisposalInstruction(**inst, facilities=enriched)
+                instructions.append(instruction)
+
+                # Automatically save to cache after enrichment
+                from app.services.cache_service import DisposalCacheService
+                from app.database import SessionLocal
+
+                db = SessionLocal()
+                cache_service = DisposalCacheService(db)
+                try:
+                    cache_service.save_instruction_sync(location, instruction, ttl_days=30)
+                    db.commit()
+                    logger.info("Saved to cache: %s|%s|%s", location, instruction.item_name, instruction.material_type)
+                except Exception as e:
+                    logger.error("Failed to cache: %s", e, exc_info=True)
+                    db.rollback()
+                finally:
+                    db.close()
 
             return {"messages": new_messages, "disposal_instructions": instructions}
         except Exception as e:
@@ -244,7 +269,7 @@ graph = StateGraph(OverallState, input=InputState, output=OutputState)
 graph.add_node("image_classification", image_classification_node)
 graph.add_node("text_classification", text_classification_node)
 graph.add_node("disposal_agent", disposal_agent_node)
-graph.add_node("tools", ToolNode([search_tool]))
+graph.add_node("tools", ToolNode([search_tool, cache_lookup_tool]))
 
 graph.add_conditional_edges(START, router_node, {
     "image_classification": "image_classification",
